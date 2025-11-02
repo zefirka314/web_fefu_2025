@@ -1,0 +1,28 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}Главная страница{% endblock %}
+{% block heading %}Добро пожаловать в учебную систему!{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="section">
+        <h2>Наши студенты</h2>
+        {% for id, student in students.items %}
+        <div class="card">
+            <h3><a href="{% url 'student_profile' id %}">{{ student.info }}</a></h3>
+            <p>Факультет: {{ student.faculty }}, {{ student.year }} курс, {{ student.status }}</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="section">
+        <h2>Наши курсы</h2>
+        {% for slug, course in courses.items %}
+        <div class="card">
+            <h3><a href="{% url 'course_detail' slug %}">{{ course.name }}</a></h3>
+            <p>{{ course.description }} - {{ course.duration }} часов</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

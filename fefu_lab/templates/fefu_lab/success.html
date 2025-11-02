@@ -1,0 +1,20 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}Успешно{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="success-message">
+        <div class="success-icon">✓</div>
+        <p>{{ message }}</p>
+    </div>
+    
+    <div style="text-align: center; margin-top: 30px;">
+        <a href="/" class="home-link">Вернуться на главную</a>
+        {% if show_feedback %}
+        <a href="/feedback/" class="home-link" style="margin-left: 10px;">Обратная связь</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fefu_lab - {% block title %}{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'fefu_lab/css/style.css' %}">
+</head>
+<body>
+    <div class="navigation">
+        <a href="{% url 'home' %}">Главная</a> | 
+        <a href="{% url 'about' %}">О нас</a> | 
+        <a href="{% url 'feedback' %}">Обратная связь</a> | 
+        <a href="{% url 'register' %}">Регистрация</a> |
+        <a href="{% url 'login' %}">Вход</a> |
+        <a href="{% url 'student_profile' 1 %}">Пример студента</a> |
+        <a href="{% url 'course_detail' 'python-basics' %}">Курс Python</a>
+    </div>    
+    
+    <div class="main-content">
+        <h1>{% block heading %}{% endblock %}</h1>
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>
