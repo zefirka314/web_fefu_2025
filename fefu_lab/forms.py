@@ -1,7 +1,8 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import UserProfile
+from .models import UserProfile, Student, Course, Enrollment
 
+# Существующие формы - сохраняем
 class FeedbackForm(forms.Form):
     name = forms.CharField(
         max_length=100,
@@ -140,3 +141,60 @@ class LoginForm(forms.Form):
             'placeholder': 'Введите ваш пароль'
         })
     )
+
+# Новые ModelForms для работы с БД
+class StudentRegistrationForm(forms.ModelForm):
+    password_confirm = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Повторите пароль'
+        }),
+        label='Подтверждение пароля'
+    )
+    
+    class Meta:
+        model = Student
+        fields = ['first_name', 'last_name', 'email', 'birth_date', 'faculty']
+        widgets = {
+            'first_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите ваше имя'
+            }),
+            'last_name': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Введите вашу фамилию'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Введите ваш email'
+            }),
+            'birth_date': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date'
+            }),
+            'faculty': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+        }
+        labels = {
+            'first_name': 'Имя',
+            'last_name': 'Фамилия', 
+            'email': 'Email',
+            'birth_date': 'Дата рождения',
+            'faculty': 'Факультет',
+        }
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if Student.objects.filter(email=email).exists():
+            raise ValidationError("Студент с таким email уже зарегистрирован")
+        return email
+
+class CourseEnrollmentForm(forms.ModelForm):
+    class Meta:
+        model = Enrollment
+        fields = ['student', 'course']
+        widgets = {
+            'student': forms.HiddenInput(),
+            'course': forms.HiddenInput(),
+        }

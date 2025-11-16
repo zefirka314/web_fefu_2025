@@ -1,0 +1,49 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}Список курсов{% endblock %}
+{% block heading %}Список курсов{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="filters" style="margin-bottom: 20px;">
+        <form method="get" class="form-inline">
+            <label for="level">Уровень:</label>
+            <select name="level" id="level" onchange="this.form.submit()" style="margin-left: 10px;">
+                <option value="">Все уровни</option>
+                <option value="BEGINNER" {% if level_filter == 'BEGINNER' %}selected{% endif %}>Начальный</option>
+                <option value="INTERMEDIATE" {% if level_filter == 'INTERMEDIATE' %}selected{% endif %}>Средний</option>
+                <option value="ADVANCED" {% if level_filter == 'ADVANCED' %}selected{% endif %}>Продвинутый</option>
+            </select>
+        </form>
+    </div>
+
+    <div class="courses-grid">
+        {% for course in courses %}
+        <div class="card">
+            <h3><a href="{% url 'course_detail' course.slug %}">{{ course.title }}</a></h3>
+            <p><strong>Преподаватель:</strong> 
+                {% if course.instructor %}
+                    {{ course.instructor.full_name }}
+                {% else %}
+                    Не назначен
+                {% endif %}
+            </p>
+            <p><strong>Продолжительность:</strong> {{ course.duration }} часов</p>
+            <p><strong>Уровень:</strong> {{ course.get_level_display }}</p>
+            <p><strong>Стоимость:</strong> 
+                {% if course.price > 0 %}
+                    {{ course.price }} руб.
+                {% else %}
+                    Бесплатно
+                {% endif %}
+            </p>
+            <p><strong>Свободных мест:</strong> {{ course.available_spots }}</p>
+        </div>
+        {% empty %}
+        <div class="alert alert-info">
+            Курсы не найдены.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

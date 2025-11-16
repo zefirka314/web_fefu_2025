@@ -1,0 +1,39 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}Список студентов{% endblock %}
+{% block heading %}Список студентов{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="filters" style="margin-bottom: 20px;">
+        <form method="get" class="form-inline">
+            <label for="faculty">Факультет:</label>
+            <select name="faculty" id="faculty" onchange="this.form.submit()" style="margin-left: 10px;">
+                <option value="">Все факультеты</option>
+                <option value="CS" {% if faculty_filter == 'CS' %}selected{% endif %}>Кибербезопасность</option>
+                <option value="SE" {% if faculty_filter == 'SE' %}selected{% endif %}>Программная инженерия</option>
+                <option value="IT" {% if faculty_filter == 'IT' %}selected{% endif %}>Информационные технологии</option>
+                <option value="DS" {% if faculty_filter == 'DS' %}selected{% endif %}>Наука о данных</option>
+                <option value="WEB" {% if faculty_filter == 'WEB' %}selected{% endif %}>Веб-технологии</option>
+            </select>
+        </form>
+    </div>
+
+    <div class="students-grid">
+        {% for student in students %}
+        <div class="card">
+            <h3><a href="{% url 'student_profile' student.pk %}">{{ student.full_name }}</a></h3>
+            <p><strong>Email:</strong> {{ student.email }}</p>
+            <p><strong>Факультет:</strong> {{ student.get_faculty_display_name }}</p>
+            {% if student.birth_date %}
+            <p><strong>Дата рождения:</strong> {{ student.birth_date }}</p>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="alert alert-info">
+            Студенты не найдены.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
