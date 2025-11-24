@@ -1,0 +1,380 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- ПРИВЕТСТВИЕ И ОБЩАЯ СТАТИСТИКА СИСТЕМЫ -->
+    <div class="dashboard-header">
+        <div class="welcome-section">
+            <h2>Панель администратора системы</h2>
+            <p>Полный контроль над учебной платформой ДВФУ</p>
+            <div class="admin-badges">
+                <span class="badge badge-admin">Администратор</span>
+                <span class="badge badge-system">Полный доступ</span>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <h3>{{ stats.total_users }}</h3>
+                    <p>Всего пользователей</p>
+                    <small>+5 за неделю</small>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🎓</div>
+                <div class="stat-content">
+                    <h3>{{ stats.total_students }}</h3>
+                    <p>Студентов</p>
+                    <small>{{ stats.active_students|default:0 }} активных</small>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👨‍🏫</div>
+                <div class="stat-content">
+                    <h3>{{ stats.total_teachers }}</h3>
+                    <p>Преподавателей</p>
+                    <small>{{ stats.active_teachers|default:0 }} активных</small>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📚</div>
+                <div class="stat-content">
+                    <h3>{{ stats.total_courses }}</h3>
+                    <p>Курсов всего</p>
+                    <small>{{ stats.active_courses }} активных</small>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📝</div>
+                <div class="stat-content">
+                    <h3>{{ stats.total_enrollments }}</h3>
+                    <p>Записей на курсы</p>
+                    <small>{{ stats.active_enrollments|default:0 }} активных</small>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">📈</div>
+                <div class="stat-content">
+                    <h3>{{ stats.occupancy_rate|default:"0" }}%</h3>
+                    <p>Заполненность системы</p>
+                    <small>Средняя по курсам</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- БЫСТРЫЕ ДЕЙСТВИЯ АДМИНИСТРАТОРА -->
+    <div class="quick-actions-section">
+        <h3>Быстрые действия</h3>
+        <div class="quick-actions-grid">
+            <a href="/admin/" class="quick-action-card admin-card" target="_blank">
+                <div class="action-icon">⚙️</div>
+                <div class="action-content">
+                    <h4>Админка Django</h4>
+                    <p>Полный доступ к управлению данными системы</p>
+                </div>
+            </a>
+            <a href="{% url 'student_list' %}" class="quick-action-card">
+                <div class="action-icon">👨‍🎓</div>
+                <div class="action-content">
+                    <h4>Управление студентами</h4>
+                    <p>Просмотр и редактирование данных студентов</p>
+                </div>
+            </a>
+            <a href="{% url 'course_list' %}" class="quick-action-card">
+                <div class="action-icon">📚</div>
+                <div class="action-content">
+                    <h4>Управление курсами</h4>
+                    <p>Создание и модификация учебных курсов</p>
+                </div>
+            </a>
+            <a href="#" class="quick-action-card">
+                <div class="action-icon">📊</div>
+                <div class="action-content">
+                    <h4>Системная аналитика</h4>
+                    <p>Детальная статистика и отчеты системы</p>
+                </div>
+            </a>
+            <a href="#" class="quick-action-card">
+                <div class="action-icon">🔧</div>
+                <div class="action-content">
+                    <h4>Настройки системы</h4>
+                    <p>Конфигурация параметров платформы</p>
+                </div>
+            </a>
+            <a href="#" class="quick-action-card">
+                <div class="action-icon">📢</div>
+                <div class="action-content">
+                    <h4>Рассылки</h4>
+                    <p>Управление уведомлениями и рассылками</p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="admin-content-layout">
+        <!-- ЛЕВАЯ КОЛОНКА - СИСТЕМНАЯ ИНФОРМАЦИЯ -->
+        <div class="admin-column">
+            <!-- ПОСЛЕДНИЕ ПОЛЬЗОВАТЕЛИ -->
+            <div class="info-card">
+                <div class="card-header">
+                    <h3>Последние пользователи</h3>
+                    <a href="/admin/auth/user/" class="btn-link">Все пользователи</a>
+                </div>
+                <div class="users-list">
+                    {% for user in recent_users %}
+                    <div class="user-item">
+                        <div class="user-avatar">
+                            {% if user.profile.avatar %}
+                                <img src="{{ user.profile.avatar.url }}" alt="Аватар">
+                            {% else %}
+                                <div class="avatar-default-xs">
+                                    {{ user.first_name|first }}{{ user.last_name|first }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">{{ user.get_full_name }}</div>
+                            <div class="user-details">
+                                <span class="user-role badge-{{ user.profile.role|lower }}">
+                                    {{ user.profile.get_role_display }}
+                                </span>
+                                <span class="user-date">{{ user.date_joined|date:"d.m.Y" }}</span>
+                            </div>
+                        </div>
+                        <div class="user-actions">
+                            <a href="/admin/auth/user/{{ user.id }}/change/" class="btn-icon" title="Редактировать">
+                                ✏️
+                            </a>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state-sm">
+                        <p>Нет зарегистрированных пользователей</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- КУРСЫ, ТРЕБУЮЩИЕ ВНИМАНИЯ -->
+            <div class="info-card">
+                <div class="card-header">
+                    <h3>Курсы с низкой доступностью</h3>
+                    <a href="{% url 'course_list' %}" class="btn-link">Все курсы</a>
+                </div>
+                <div class="courses-alert-list">
+                    {% for course in crowded_courses %}
+                    <div class="alert-item">
+                        <div class="alert-icon">⚠️</div>
+                        <div class="alert-content">
+                            <div class="alert-title">
+                                <a href="{% url 'course_detail' course.slug %}">{{ course.title }}</a>
+                            </div>
+                            <div class="alert-details">
+                                <span>Свободно: {{ course.available_spots }} мест</span>
+                                <span>Заполненность: {% widthratio course.enrolled_students_count course.max_students 100 %}%</span>
+                            </div>
+                        </div>
+                        <div class="alert-actions">
+                            <a href="/admin/fefu_lab/course/{{ course.id }}/change/" class="btn-sm">Изменить</a>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state-sm">
+                        <p>Все курсы имеют достаточную доступность</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА - СИСТЕМНЫЕ СТАТУСЫ И ДЕЙСТВИЯ -->
+        <div class="admin-column">
+            <!-- СИСТЕМНЫЕ СТАТУСЫ -->
+            <div class="info-card">
+                <div class="card-header">
+                    <h3>Статус системы</h3>
+                    <span class="status-indicator online">Online</span>
+                </div>
+                <div class="system-status">
+                    <div class="status-item">
+                        <div class="status-name">База данных</div>
+                        <div class="status-value">
+                            <span class="status-dot online"></span>
+                            Работает
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-name">Файловая система</div>
+                        <div class="status-value">
+                            <span class="status-dot online"></span>
+                            Доступна
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-name">Отправка email</div>
+                        <div class="status-value">
+                            <span class="status-dot warning"></span>
+                            В разработке
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-name">Резервное копирование</div>
+                        <div class="status-value">
+                            <span class="status-dot offline"></span>
+                            Не настроено
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- БЫСТРЫЕ СИСТЕМНЫЕ ДЕЙСТВИЯ -->
+            <div class="info-card">
+                <div class="card-header">
+                    <h3>Системные действия</h3>
+                </div>
+                <div class="system-actions">
+                    <button class="system-action-btn" onclick="runSystemAction('backup')">
+                        <span class="action-icon">💾</span>
+                        <span class="action-text">Создать бэкап</span>
+                    </button>
+                    <button class="system-action-btn" onclick="runSystemAction('cleanup')">
+                        <span class="action-icon">🧹</span>
+                        <span class="action-text">Очистка кэша</span>
+                    </button>
+                    <button class="system-action-btn" onclick="runSystemAction('reports')">
+                        <span class="action-icon">📋</span>
+                        <span class="action-text">Генерация отчетов</span>
+                    </button>
+                    <button class="system-action-btn" onclick="runSystemAction('maintenance')">
+                        <span class="action-icon">🔧</span>
+                        <span class="action-text">Режим обслуживания</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- СТАТИСТИКА АКТИВНОСТИ -->
+            <div class="info-card">
+                <div class="card-header">
+                    <h3>Активность за сегодня</h3>
+                </div>
+                <div class="activity-stats">
+                    <div class="activity-item">
+                        <div class="activity-metric">15</div>
+                        <div class="activity-label">Новых регистраций</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-metric">42</div>
+                        <div class="activity-label">Записей на курсы</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-metric">128</div>
+                        <div class="activity-label">Посещений сайта</div>
+                    </div>
+                    <div class="activity-item">
+                        <div class="activity-metric">8</div>
+                        <div class="activity-label">Новых курсов</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- СИСТЕМНЫЕ УВЕДОМЛЕНИЯ -->
+    <div class="notifications-section">
+        <div class="section-header">
+            <h3>Системные уведомления</h3>
+            <button class="btn btn-outline" onclick="markAllAsRead()">Отметить все как прочитанные</button>
+        </div>
+        <div class="notifications-list">
+            <div class="notification-item warning">
+                <div class="notification-icon">⚠️</div>
+                <div class="notification-content">
+                    <div class="notification-title">Требуется обновление системы</div>
+                    <div class="notification-message">Доступна новая версия платформы. Рекомендуется обновить систему в ближайшее время.</div>
+                    <div class="notification-time">2 часа назад</div>
+                </div>
+                <div class="notification-actions">
+                    <button class="btn-icon">❌</button>
+                </div>
+            </div>
+            <div class="notification-item info">
+                <div class="notification-icon">ℹ️</div>
+                <div class="notification-content">
+                    <div class="notification-title">Запланированное обслуживание</div>
+                    <div class="notification-message">Технические работы запланированы на 25 декабря с 02:00 до 04:00.</div>
+                    <div class="notification-time">Вчера</div>
+                </div>
+                <div class="notification-actions">
+                    <button class="btn-icon">❌</button>
+                </div>
+            </div>
+            <div class="notification-item success">
+                <div class="notification-icon">✅</div>
+                <div class="notification-content">
+                    <div class="notification-title">Резервное копирование завершено</div>
+                    <div class="notification-message">Последнее резервное копирование данных выполнено успешно.</div>
+                    <div class="notification-time">3 дня назад</div>
+                </div>
+                <div class="notification-actions">
+                    <button class="btn-icon">❌</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация системных действий
+    window.runSystemAction = function(action) {
+        const actions = {
+            'backup': 'Создание резервной копии...',
+            'cleanup': 'Очистка системного кэша...',
+            'reports': 'Генерация отчетов...',
+            'maintenance': 'Переход в режим обслуживания...'
+        };
+        
+        if (confirm(`Вы уверены, что хотите выполнить действие: "${actions[action]}"?`)) {
+            // Здесь будет AJAX запрос к серверу
+            showNotification(`Запущено: ${actions[action]}`, 'info');
+            
+            // Имитация выполнения действия
+            setTimeout(() => {
+                showNotification(`Действие "${actions[action]}" завершено успешно`, 'success');
+            }, 2000);
+        }
+    };
+
+    // Показать уведомление
+    function showNotification(message, type = 'info') {
+        // Реализация показа уведомлений
+        console.log(`[${type.toUpperCase()}] ${message}`);
+    }
+
+    // Отметить все уведомления как прочитанные
+    window.markAllAsRead = function() {
+        document.querySelectorAll('.notification-item').forEach(item => {
+            item.style.opacity = '0.6';
+        });
+        showNotification('Все уведомления отмечены как прочитанные', 'success');
+    };
+
+    // Автообновление статистики
+    function refreshStats() {
+        // Здесь может быть AJAX запрос для обновления статистики
+        console.log('Refreshing admin dashboard statistics...');
+    }
+
+    // Обновляем статистику каждую минуту
+    setInterval(refreshStats, 60000);
+});
+</script>
+{% endblock %}

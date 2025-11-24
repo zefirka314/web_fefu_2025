@@ -5,6 +5,45 @@
 
 {% block content %}
 <div class="container">
+    <!-- ПРИВЕТСТВИЕ ДЛЯ АВТОРИЗОВАННЫХ ПОЛЬЗОВАТЕЛЕЙ -->
+    {% if user.is_authenticated %}
+    <div class="welcome-card card">
+        <div class="welcome-content">
+            <h2>Добро пожаловать, {{ user.first_name }}!</h2>
+            <p>Рады видеть вас снова в учебной системе ДВФУ.</p>
+            
+            <!-- ИНФОРМАЦИЯ ПО РОЛЯМ -->
+            {% if user.profile.role == 'STUDENT' %}
+                <div class="role-badge badge badge-active">Студент</div>
+                <p>Продолжайте обучение на ваших курсах или откройте для себя новые возможности!</p>
+            {% elif user.profile.role == 'TEACHER' %}
+                <div class="role-badge badge badge-completed">Преподаватель</div>
+                <p>Управляйте своими курсами и помогайте студентам в обучении!</p>
+            {% elif user.profile.role == 'ADMIN' %}
+                <div class="role-badge badge badge-dropped">Администратор</div>
+                <p>Управляйте системой и поддерживайте её работу!</p>
+            {% endif %}
+        </div>
+        <div class="welcome-actions">
+            <a href="{% url 'dashboard' %}" class="btn btn-primary">Перейти в личный кабинет</a>
+        </div>
+    </div>
+    {% else %}
+    <!-- ПРИВЕТСТВИЕ ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ -->
+    <div class="welcome-card card">
+        <div class="welcome-content">
+            <h2>Начните обучение сегодня!</h2>
+            <p>Присоединяйтесь к сообществу студентов и преподавателей ДВФУ.</p>
+            <p>Откройте для себя мир знаний с нашей современной образовательной платформой.</p>
+        </div>
+        <div class="welcome-actions">
+            <a href="{% url 'register' %}" class="btn btn-primary">Зарегистрироваться</a>
+            <a href="{% url 'login' %}" class="btn">Войти в систему</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- СТАТИСТИКА СИСТЕМЫ -->
     <div class="stats-grid">
         <div class="stat-card">
             <h3>{{ total_students }}+</h3>
@@ -18,38 +57,184 @@
             <h3>{{ total_instructors }}+</h3>
             <p>Преподавателей</p>
         </div>
+        <div class="stat-card">
+            <h3>{{ total_enrollments }}+</h3>
+            <p>Записей на курсы</p>
+        </div>
     </div>
 
+    <!-- ПЕРСОНАЛЬНЫЕ РЕКОМЕНДАЦИИ ДЛЯ АВТОРИЗОВАННЫХ ПОЛЬЗОВАТЕЛЕЙ -->
+    {% if user.is_authenticated %}
+        {% if user.profile.role == 'STUDENT' and user_courses %}
+        <div class="section">
+            <h2>Ваши текущие курсы</h2>
+            <div class="courses-grid">
+                {% for enrollment in user_courses %}
+                <div class="card course-card">
+                    <h3><a href="{% url 'course_detail' enrollment.course.slug %}">{{ enrollment.course.title }}</a></h3>
+                    <p>{{ enrollment.course.description|truncatewords:20 }}</p>
+                    <div class="course-meta">
+                        <span class="badge badge-{{ enrollment.status|lower }}">{{ enrollment.get_status_display }}</span>
+                        <span>Преподаватель: {{ enrollment.course.instructor.full_name|default:"Не назначен" }}</span>
+                    </div>
+                    <div class="progress">
+                        <div class="progress-bar" style="width: {% if enrollment.status == 'COMPLETED' %}100%{% else %}50%{% endif %}"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="text-center">
+                <a href="{% url 'student_dashboard' %}" class="btn">Все мои курсы</a>
+            </div>
+        </div>
+        {% elif user.profile.role == 'TEACHER' and user.profile.instructor.courses.exists %}
+        <div class="section">
+            <h2>Ваши курсы</h2>
+            <div class="courses-grid">
+                {% for course in user.profile.instructor.courses.all|slice:":3" %}
+                <div class="card course-card">
+                    <h3><a href="{% url 'course_detail' course.slug %}">{{ course.title }}</a></h3>
+                    <p>{{ course.description|truncatewords:20 }}</p>
+                    <div class="course-meta">
+                        <span class="badge badge-active">{{ course.enrolled_students_count }} студентов</span>
+                        <span>{{ course.get_level_display }}</span>
+                    </div>
+                    <div class="course-actions">
+                        <a href="{% url 'teacher_course_management' course.slug %}" class="btn btn-primary">Управление</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="text-center">
+                <a href="{% url 'teacher_dashboard' %}" class="btn">Все мои курсы</a>
+            </div>
+        </div>
+        {% endif %}
+    {% endif %}
+
+    <!-- НОВЫЕ КУРСЫ (ДЛЯ ВСЕХ) -->
     {% if recent_courses %}
     <div class="section">
         <h2>Новые курсы</h2>
-        {% for course in recent_courses %}
-        <div class="card">
-            <h3><a href="{% url 'course_detail' course.slug %}">{{ course.title }}</a></h3>
-            <p>{{ course.description|truncatewords:30 }}</p>
-            <p><strong>Преподаватель:</strong> 
-                {% if course.instructor %}
-                    {{ course.instructor.full_name }}
-                {% else %}
-                    Не назначен
+        <div class="courses-grid">
+            {% for course in recent_courses %}
+            <div class="card course-card">
+                <h3><a href="{% url 'course_detail' course.slug %}">{{ course.title }}</a></h3>
+                <p>{{ course.description|truncatewords:30 }}</p>
+                <div class="course-meta">
+                    <p><strong>Преподаватель:</strong> 
+                        {% if course.instructor %}
+                            {{ course.instructor.full_name }}
+                        {% else %}
+                            Не назначен
+                        {% endif %}
+                    </p>
+                    <p><strong>Продолжительность:</strong> {{ course.duration }} часов</p>
+                    <p><strong>Уровень:</strong> {{ course.get_level_display }}</p>
+                    <p><strong>Свободных мест:</strong> {{ course.available_spots }} из {{ course.max_students }}</p>
+                </div>
+                {% if user.is_authenticated and user.profile.role == 'STUDENT' %}
+                <div class="course-actions">
+                    <a href="{% url 'course_detail' course.slug %}" class="btn btn-primary">Подробнее</a>
+                    {% if course.available_spots > 0 %}
+                    <a href="{% url 'enroll_in_course' course.slug %}" class="btn">Записаться</a>
+                    {% else %}
+                    <span class="btn disabled">Мест нет</span>
+                    {% endif %}
+                </div>
                 {% endif %}
-            </p>
-            <p><strong>Продолжительность:</strong> {{ course.duration }} часов</p>
-            <p><strong>Уровень:</strong> {{ course.get_level_display }}</p>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
+        <div class="text-center">
+            <a href="{% url 'course_list' %}" class="btn">Все курсы</a>
+        </div>
     </div>
     {% endif %}
 
+    <!-- ПОСЛЕДНИЕ СТУДЕНТЫ -->
     <div class="section">
         <h2>Наши студенты</h2>
-        {% for student in students %}
-        <div class="card">
-            <h3><a href="{% url 'student_profile' student.pk %}">{{ student.full_name }}</a></h3>
-            <p>Факультет: {{ student.get_faculty_display_name }}</p>
-            <p>Email: {{ student.email }}</p>
+        <div class="students-grid">
+            {% for student in students %}
+            <div class="card student-card">
+                <div class="student-header">
+                    <h3><a href="{% url 'student_profile' student.pk %}">{{ student.full_name }}</a></h3>
+                    {% if student.user.profile.avatar %}
+                    <img src="{{ student.user.profile.avatar.url }}" alt="Аватар" class="student-avatar">
+                    {% endif %}
+                </div>
+                <div class="student-info">
+                    <p><strong>Факультет:</strong> {{ student.get_faculty_display_name }}</p>
+                    <p><strong>Email:</strong> {{ student.email }}</p>
+                    {% if student.birth_date %}
+                    <p><strong>Возраст:</strong> {{ student.get_age }} лет</p>
+                    {% endif %}
+                </div>
+                {% if user.is_authenticated and user.profile.role in 'TEACHER,ADMIN' %}
+                <div class="student-actions">
+                    <a href="{% url 'student_profile' student.pk %}" class="btn">Профиль</a>
+                </div>
+                {% endif %}
+            </div>
+            {% empty %}
+            <div class="alert alert-info">
+                Студенты не найдены.
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
+        <div class="text-center">
+            <a href="{% url 'student_list' %}" class="btn">Все студенты</a>
+        </div>
     </div>
+
+    <!-- БЫСТРЫЕ ССЫЛКИ ДЛЯ РАЗНЫХ РОЛЕЙ -->
+    {% if user.is_authenticated %}
+    <div class="section">
+        <h2>Быстрый доступ</h2>
+        <div class="quick-links">
+            {% if user.profile.role == 'STUDENT' %}
+            <a href="{% url 'course_list' %}" class="quick-link">
+                <h3>📚 Все курсы</h3>
+                <p>Откройте для себя новые образовательные возможности</p>
+            </a>
+            <a href="{% url 'student_dashboard' %}" class="quick-link">
+                <h3>🎓 Мой прогресс</h3>
+                <p>Следите за вашими успехами в обучении</p>
+            </a>
+            <a href="{% url 'profile' %}" class="quick-link">
+                <h3>👤 Мой профиль</h3>
+                <p>Обновите ваши личные данные и настройки</p>
+            </a>
+            {% elif user.profile.role == 'TEACHER' %}
+            <a href="{% url 'teacher_dashboard' %}" class="quick-link">
+                <h3>📊 Дашборд</h3>
+                <p>Управляйте вашими курсами и студентами</p>
+            </a>
+            <a href="{% url 'course_list' %}" class="quick-link">
+                <h3>➕ Создать курс</h3>
+                <p>Добавьте новый учебный материал</p>
+            </a>
+            <a href="{% url 'profile' %}" class="quick-link">
+                <h3>👤 Профиль</h3>
+                <p>Настройки преподавателя</p>
+            </a>
+            {% elif user.profile.role == 'ADMIN' %}
+            <a href="{% url 'admin_dashboard' %}" class="quick-link">
+                <h3>⚙️ Панель управления</h3>
+                <p>Управление всей системой</p>
+            </a>
+            <a href="/admin/" class="quick-link">
+                <h3>🔧 Админка Django</h3>
+                <p>Расширенное управление данными</p>
+            </a>
+            <a href="{% url 'student_list' %}" class="quick-link">
+                <h3>👥 Студенты</h3>
+                <p>Управление пользователями системы</p>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

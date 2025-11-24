@@ -1,0 +1,283 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- ПРИВЕТСТВИЕ И СТАТИСТИКА -->
+    <div class="dashboard-header">
+        <div class="welcome-section">
+            <h2>Добро пожаловать, {{ student.first_name }}!</h2>
+            <p>Здесь вы можете управлять своим обучением и отслеживать прогресс</p>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📚</div>
+                <div class="stat-content">
+                    <h3>{{ enrollments.count }}</h3>
+                    <p>Всего курсов</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🎯</div>
+                <div class="stat-content">
+                    <h3>{{ active_courses }}</h3>
+                    <p>Активных курсов</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-content">
+                    <h3>{{ completed_courses }}</h3>
+                    <p>Завершено курсов</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⏱️</div>
+                <div class="stat-content">
+                    <h3>{{ student.get_faculty_display_name }}</h3>
+                    <p>Ваш факультет</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- БЫСТРЫЕ ДЕЙСТВИЯ -->
+    <div class="quick-actions-section">
+        <h3>Быстрые действия</h3>
+        <div class="quick-actions-grid">
+            <a href="{% url 'course_list' %}" class="quick-action-card">
+                <div class="action-icon">🔍</div>
+                <div class="action-content">
+                    <h4>Найти курсы</h4>
+                    <p>Откройте для себя новые образовательные возможности</p>
+                </div>
+            </a>
+            <a href="{% url 'profile' %}" class="quick-action-card">
+                <div class="action-icon">👤</div>
+                <div class="action-content">
+                    <h4>Редактировать профиль</h4>
+                    <p>Обновите ваши личные данные и настройки</p>
+                </div>
+            </a>
+            <a href="{% url 'student_list' %}" class="quick-action-card">
+                <div class="action-icon">👥</div>
+                <div class="action-content">
+                    <h4>Сокурсники</h4>
+                    <p>Посмотрите других студентов вашего факультета</p>
+                </div>
+            </a>
+            <a href="{% url 'feedback' %}" class="quick-action-card">
+                <div class="action-icon">💬</div>
+                <div class="action-content">
+                    <h4>Обратная связь</h4>
+                    <p>Поделитесь вашим мнением о системе</p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- МОИ КУРСЫ -->
+    <div class="courses-section">
+        <div class="section-header">
+            <h3>Мои курсы</h3>
+            <div class="section-actions">
+                <a href="{% url 'course_list' %}" class="btn btn-primary">Найти новые курсы</a>
+            </div>
+        </div>
+
+        {% if enrollments %}
+            <div class="courses-tabs">
+                <div class="tab-buttons">
+                    <button class="tab-button active" data-tab="all">Все курсы ({{ enrollments.count }})</button>
+                    <button class="tab-button" data-tab="active">Активные ({{ active_courses }})</button>
+                    <button class="tab-button" data-tab="completed">Завершенные ({{ completed_courses }})</button>
+                </div>
+
+                <div class="tab-content">
+                    <!-- ВСЕ КУРСЫ -->
+                    <div class="tab-pane active" id="tab-all">
+                        <div class="enrollments-grid">
+                            {% for enrollment in enrollments %}
+                            <div class="enrollment-card" data-status="{{ enrollment.status }}">
+                                <div class="course-header">
+                                    <h4>
+                                        <a href="{% url 'course_detail' enrollment.course.slug %}">
+                                            {{ enrollment.course.title }}
+                                        </a>
+                                    </h4>
+                                    <span class="status-badge badge-{{ enrollment.status|lower }}">
+                                        {{ enrollment.get_status_display }}
+                                    </span>
+                                </div>
+                                
+                                <div class="course-info">
+                                    <p class="course-description">
+                                        {{ enrollment.course.description|truncatewords:20 }}
+                                    </p>
+                                    
+                                    <div class="course-meta">
+                                        <div class="meta-item">
+                                            <strong>Преподаватель:</strong>
+                                            {% if enrollment.course.instructor %}
+                                                {{ enrollment.course.instructor.full_name }}
+                                            {% else %}
+                                                Не назначен
+                                            {% endif %}
+                                        </div>
+                                        <div class="meta-item">
+                                            <strong>Уровень:</strong> {{ enrollment.course.get_level_display }}
+                                        </div>
+                                        <div class="meta-item">
+                                            <strong>Продолжительность:</strong> {{ enrollment.course.duration }} часов
+                                        </div>
+                                        {% if enrollment.grade %}
+                                        <div class="meta-item">
+                                            <strong>Оценка:</strong> 
+                                            <span class="grade-badge">{{ enrollment.grade }}</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="enrollment-dates">
+                                    <small>Записан: {{ enrollment.enrolled_at|date:"d.m.Y" }}</small>
+                                    {% if enrollment.completed_at %}
+                                    <small>Завершен: {{ enrollment.completed_at|date:"d.m.Y" }}</small>
+                                    {% endif %}
+                                </div>
+
+                                <div class="course-progress">
+                                    <div class="progress">
+                                        <div class="progress-bar" style="width: {% if enrollment.status == 'COMPLETED' %}100%{% else %}60%{% endif %}"></div>
+                                    </div>
+                                    <span class="progress-text">
+                                        {% if enrollment.status == 'COMPLETED' %}
+                                            Курс завершен
+                                        {% elif enrollment.status == 'ACTIVE' %}
+                                            В процессе обучения
+                                        {% else %}
+                                            Обучение приостановлено
+                                        {% endif %}
+                                    </span>
+                                </div>
+
+                                <div class="course-actions">
+                                    <a href="{% url 'course_detail' enrollment.course.slug %}" class="btn btn-sm">
+                                        Перейти к курсу
+                                    </a>
+                                    {% if enrollment.status == 'ACTIVE' %}
+                                    <button class="btn btn-sm btn-outline" disabled>
+                                        Продолжить обучение
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- АКТИВНЫЕ КУРСЫ -->
+                    <div class="tab-pane" id="tab-active">
+                        <div class="enrollments-grid">
+                            {% for enrollment in enrollments %}
+                                {% if enrollment.status == 'ACTIVE' %}
+                                <div class="enrollment-card">
+                                    <!-- Тот же контент что и выше, но только для активных -->
+                                    {% include "fefu_lab/dashboard/partials/enrollment_card.html" with enrollment=enrollment %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- ЗАВЕРШЕННЫЕ КУРСЫ -->
+                    <div class="tab-pane" id="tab-completed">
+                        <div class="enrollments-grid">
+                            {% for enrollment in enrollments %}
+                                {% if enrollment.status == 'COMPLETED' %}
+                                <div class="enrollment-card">
+                                    <!-- Тот же контент что и выше, но только для завершенных -->
+                                    {% include "fefu_lab/dashboard/partials/enrollment_card.html" with enrollment=enrollment %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📚</div>
+                <h4>У вас пока нет записей на курсы</h4>
+                <p>Начните свое обучение, выбрав подходящие курсы из нашего каталога</p>
+                <a href="{% url 'course_list' %}" class="btn btn-primary">Найти курсы</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- РЕКОМЕНДАЦИИ -->
+    <div class="recommendations-section">
+        <h3>Рекомендуемые курсы</h3>
+        <div class="recommendations-grid">
+            <!-- Здесь могут быть рекомендованные курсы на основе факультета студента -->
+            <div class="recommendation-card">
+                <div class="recommendation-badge">Рекомендуем</div>
+                <h4>Основы программирования</h4>
+                <p>Идеально для начала карьеры в IT</p>
+                <div class="recommendation-meta">
+                    <span>Начальный уровень</span>
+                    <span>40 часов</span>
+                </div>
+                <a href="{% url 'course_list' %}?level=BEGINNER" class="btn btn-sm">Смотреть похожие</a>
+            </div>
+            
+            <div class="recommendation-card">
+                <div class="recommendation-badge">Для вашего факультета</div>
+                <h4>Продвинутая кибербезопасность</h4>
+                <p>Углубленное изучение защиты сетей</p>
+                <div class="recommendation-meta">
+                    <span>Продвинутый уровень</span>
+                    <span>60 часов</span>
+                </div>
+                <a href="{% url 'course_list' %}?level=ADVANCED" class="btn btn-sm">Смотреть похожие</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Табы для фильтрации курсов
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tab');
+            
+            // Обновляем активные табы
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            tabPanes.forEach(pane => pane.classList.remove('active'));
+            
+            this.classList.add('active');
+            document.getElementById(`tab-${targetTab}`).classList.add('active');
+        });
+    });
+
+    // Анимация прогресс-баров
+    const progressBars = document.querySelectorAll('.progress-bar');
+    progressBars.forEach(bar => {
+        const width = bar.style.width;
+        bar.style.width = '0';
+        setTimeout(() => {
+            bar.style.width = width;
+        }, 100);
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,111 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-container">
+        <div class="form-header">
+            <h2>Вход в систему</h2>
+            <p>Войдите в свой аккаунт для доступа к учебным материалам</p>
+        </div>
+
+        <!-- ВЫВОД СООБЩЕНИЙ -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- ФОРМА ВХОДА -->
+        <form method="post" class="login-form">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="id_username">Email или имя пользователя *</label>
+                <input type="text" name="username" id="id_username" class="form-control" 
+                       value="{{ form.username.value|default:'' }}" required
+                       placeholder="Введите ваш email или имя пользователя">
+                {% if form.username.errors %}
+                    <div class="field-error">
+                        {% for error in form.username.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <div class="form-group">
+                <label for="id_password">Пароль *</label>
+                <input type="password" name="password" id="id_password" class="form-control" required
+                       placeholder="Введите ваш пароль">
+                {% if form.password.errors %}
+                    <div class="field-error">
+                        {% for error in form.password.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ -->
+            <div class="form-options">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
+                    <label class="form-check-label" for="remember_me">
+                        Запомнить меня
+                    </label>
+                </div>
+                
+                <div class="forgot-password">
+                    <a href="#">Забыли пароль?</a>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-lg btn-block">
+                Войти в систему
+            </button>
+
+            <!-- ДЕМО-ДОСТУП (опционально) -->
+            <div class="demo-accounts">
+                <details>
+                    <summary>Тестовые аккаунты для демонстрации</summary>
+                    <div class="demo-list">
+                        <div class="demo-account">
+                            <strong>Студент:</strong> student / password123
+                        </div>
+                        <div class="demo-account">
+                            <strong>Преподаватель:</strong> teacher / password123
+                        </div>
+                        <div class="demo-account">
+                            <strong>Администратор:</strong> admin / password123
+                        </div>
+                    </div>
+                </details>
+            </div>
+        </form>
+
+        <!-- РАЗДЕЛИТЕЛЬ -->
+        <div class="form-divider">
+            <span>или</span>
+        </div>
+
+        <!-- АЛЬТЕРНАТИВНЫЕ ВАРИАНТЫ -->
+        <div class="alternative-actions">
+            <p>Еще нет аккаунта?</p>
+            <a href="{% url 'register' %}" class="btn btn-secondary btn-block">
+                Зарегистрироваться
+            </a>
+        </div>
+
+        <!-- ДОПОЛНИТЕЛЬНЫЕ ССЫЛКИ -->
+        <div class="form-footer">
+            <p><a href="{% url 'home' %}">Вернуться на главную страницу</a></p>
+            <p><a href="{% url 'course_list' %}">Просмотреть курсы без регистрации</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,146 @@
+[file name]: 500.html
+[file content begin]
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}Ошибка сервера{% endblock %}
+{% block heading %}500 - Ошибка сервера{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="error-page" style="text-align: center; padding: 60px 20px;">
+        <div class="error-icon" style="font-size: 96px; color: #dc3545; margin-bottom: 30px;">⚠️</div>
+        <div class="error-code" style="font-size: 72px; color: #dc3545; margin-bottom: 20px; font-weight: bold;">500</div>
+        
+        <h2 style="color: #2c3e50; margin-bottom: 20px;">Внутренняя ошибка сервера</h2>
+        
+        <div class="error-message" style="max-width: 600px; margin: 0 auto 30px;">
+            <p style="font-size: 18px; color: #495057; margin-bottom: 15px;">
+                На сервере произошла непредвиденная ошибка. Мы уже работаем над устранением проблемы.
+            </p>
+            <p style="color: #6c757d;">
+                Пожалуйста, попробуйте обновить страницу через несколько минут или вернитесь на главную страницу.
+            </p>
+        </div>
+
+        <!-- ТЕХНИЧЕСКАЯ ИНФОРМАЦИЯ (только для разработчиков/админов) -->
+        {% if user.is_authenticated and user.profile.role == 'ADMIN' %}
+        <div class="technical-info" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 30px auto; max-width: 800px; text-align: left;">
+            <h4 style="color: #dc3545; margin-bottom: 15px;">Техническая информация (только для администраторов):</h4>
+            {% if request.sentry_event_id %}
+            <p style="margin-bottom: 10px;">
+                <strong>ID ошибки:</strong> <code>{{ request.sentry_event_id }}</code>
+            </p>
+            {% endif %}
+            <details style="margin-top: 15px;">
+                <summary style="cursor: pointer; font-weight: bold; color: #495057;">
+                    Подробности ошибки
+                </summary>
+                <div style="margin-top: 10px; padding: 15px; background: white; border-radius: 4px; font-family: monospace; font-size: 14px;">
+                    <!-- Здесь может выводиться stack trace в режиме DEBUG -->
+                    {% if debug %}
+                        <pre>{{ error_traceback }}</pre>
+                    {% else %}
+                        <p>Подробная информация доступна только в режиме DEBUG</p>
+                    {% endif %}
+                </div>
+            </details>
+        </div>
+        {% endif %}
+
+        <!-- ДЕЙСТВИЯ -->
+        <div class="error-actions" style="margin-top: 40px;">
+            <div class="action-buttons" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <a href="{% url 'home' %}" class="btn btn-primary" style="padding: 12px 30px;">
+                    🏠 Вернуться на главную
+                </a>
+                <button onclick="window.location.reload()" class="btn btn-secondary" style="padding: 12px 30px;">
+                    🔄 Обновить страницу
+                </button>
+                <a href="{% url 'feedback' %}" class="btn btn-outline" style="padding: 12px 30px;">
+                    📧 Сообщить о проблеме
+                </a>
+            </div>
+        </div>
+
+        <!-- ДОПОЛНИТЕЛЬНАЯ ПОМОЩЬ -->
+        <div class="help-section" style="margin-top: 50px; padding: 30px; background: #e9f7fe; border-radius: 8px; max-width: 700px; margin-left: auto; margin-right: auto;">
+            <h4 style="color: #0c5460; margin-bottom: 15px;">Нужна помощь?</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; text-align: left;">
+                <div class="help-option">
+                    <h5 style="color: #0c5460; margin-bottom: 10px;">📞 Техническая поддержка</h5>
+                    <p style="margin: 0; color: #495057; font-size: 14px;">
+                        Телефон: +7 (423) 123-45-67<br>
+                        Email: support@fefu-lab.ru
+                    </p>
+                </div>
+                <div class="help-option">
+                    <h5 style="color: #0c5460; margin-bottom: 10px;">🕒 Время работы</h5>
+                    <p style="margin: 0; color: #495057; font-size: 14px;">
+                        Пн-Пт: 9:00-18:00<br>
+                        Сб-Вс: выходные
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- СТАТУС СИСТЕМЫ -->
+        <div class="system-status" style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; max-width: 600px; margin-left: auto; margin-right: auto;">
+            <h5 style="color: #495057; margin-bottom: 15px;">Статус системы</h5>
+            <div style="display: flex; justify-content: center; gap: 30px; flex-wrap: wrap;">
+                <div class="status-item" style="text-align: center;">
+                    <div class="status-indicator online" style="width: 12px; height: 12px; background: #28a745; border-radius: 50%; margin: 0 auto 5px;"></div>
+                    <span style="font-size: 14px; color: #495057;">Сайт</span>
+                </div>
+                <div class="status-item" style="text-align: center;">
+                    <div class="status-indicator online" style="width: 12px; height: 12px; background: #28a745; border-radius: 50%; margin: 0 auto 5px;"></div>
+                    <span style="font-size: 14px; color: #495057;">База данных</span>
+                </div>
+                <div class="status-item" style="text-align: center;">
+                    <div class="status-indicator warning" style="width: 12px; height: 12px; background: #ffc107; border-radius: 50%; margin: 0 auto 5px;"></div>
+                    <span style="font-size: 14px; color: #495057;">Восстановление</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Автоматическая попытка восстановления через 30 секунд
+    setTimeout(function() {
+        console.log('Автоматическое восстановление...');
+        // Можно добавить проверку доступности сервера
+        fetch(window.location.href, { method: 'HEAD' })
+            .then(response => {
+                if (response.ok) {
+                    window.location.reload();
+                }
+            })
+            .catch(error => {
+                console.log('Сервер все еще недоступен');
+            });
+    }, 30000);
+
+    // Отслеживание кликов для аналитики
+    document.querySelectorAll('.error-actions .btn').forEach(button => {
+        button.addEventListener('click', function() {
+            console.log('Пользователь выбрал действие:', this.textContent.trim());
+            // Здесь можно отправить данные в аналитику
+        });
+    });
+
+    // Показать/скрыть техническую информацию
+    const details = document.querySelector('details');
+    if (details) {
+        details.addEventListener('toggle', function() {
+            if (this.open) {
+                console.log('Пользователь открыл технические детали ошибки');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+[file content end]

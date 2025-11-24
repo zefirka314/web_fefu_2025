@@ -1,0 +1,325 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="profile-layout">
+        <!-- БОКОВАЯ ПАНЕЛЬ С ИНФОРМАЦИЕЙ -->
+        <div class="profile-sidebar">
+            <!-- ИНФОРМАЦИЯ О ПОЛЬЗОВАТЕЛЕ -->
+            <div class="user-card card">
+                <div class="user-avatar">
+                    {% if user.profile.avatar %}
+                        <img src="{{ user.profile.avatar.url }}" alt="Аватар" class="avatar-large">
+                    {% else %}
+                        <div class="avatar-default-large">
+                            {{ user.first_name|first }}{{ user.last_name|first }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="user-info">
+                    <h2>{{ user.get_full_name }}</h2>
+                    <div class="user-role">
+                        <span class="badge badge-{{ user.profile.role|lower }}">
+                            {{ user.profile.get_role_display }}
+                        </span>
+                    </div>
+                    <p class="user-email">{{ user.email }}</p>
+                    <p class="user-joined">В системе с: {{ user.date_joined|date:"d.m.Y" }}</p>
+                </div>
+            </div>
+
+            <!-- СТАТИСТИКА ПО РОЛЯМ -->
+            <div class="stats-card card">
+                <h3>Статистика</h3>
+                {% if user.profile.role == 'STUDENT' and student %}
+                    <div class="stat-item">
+                        <span class="stat-label">Курсов записано:</span>
+                        <span class="stat-value">{{ enrollments.count }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Активных курсов:</span>
+                        <span class="stat-value">{{ enrollments|length }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Завершено курсов:</span>
+                        <span class="stat-value">{{ enrollments|length }}</span>
+                    </div>
+                {% elif user.profile.role == 'TEACHER' and instructor %}
+                    <div class="stat-item">
+                        <span class="stat-label">Мои курсы:</span>
+                        <span class="stat-value">{{ courses.count }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Всего студентов:</span>
+                        <span class="stat-value">
+                            {% with total=0 %}
+                                {% for course in courses %}
+                                    {% widthratio course.enrolled_students_count 1 1 as count %}
+                                    {{ count|add:total }}
+                                {% endfor %}
+                            {% endwith %}
+                        </span>
+                    </div>
+                {% elif user.profile.role == 'ADMIN' %}
+                    <div class="stat-item">
+                        <span class="stat-label">Уровень доступа:</span>
+                        <span class="stat-value">Полный</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- БЫСТРЫЕ ДЕЙСТВИЯ -->
+            <div class="actions-card card">
+                <h3>Быстрые действия</h3>
+                <a href="{% url 'dashboard' %}" class="action-link">
+                    📊 Личный кабинет
+                </a>
+                {% if user.profile.role == 'STUDENT' %}
+                    <a href="{% url 'course_list' %}" class="action-link">
+                        📚 Записаться на курс
+                    </a>
+                {% elif user.profile.role == 'TEACHER' %}
+                    <a href="{% url 'teacher_dashboard' %}" class="action-link">
+                        👨‍🏫 Управление курсами
+                    </a>
+                {% elif user.profile.role == 'ADMIN' %}
+                    <a href="{% url 'admin_dashboard' %}" class="action-link">
+                        ⚙️ Панель управления
+                    </a>
+                    <a href="/admin/" class="action-link">
+                        🔧 Админка Django
+                    </a>
+                {% endif %}
+                <a href="{% url 'logout' %}" class="action-link logout">
+                    🚪 Выйти из системы
+                </a>
+            </div>
+        </div>
+
+        <!-- ОСНОВНОЕ СОДЕРЖИМОЕ -->
+        <div class="profile-content">
+            <!-- СООБЩЕНИЯ -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- ФОРМЫ РЕДАКТИРОВАНИЯ -->
+            <div class="edit-forms">
+                <!-- ФОРМА ОСНОВНЫХ ДАННЫХ -->
+                <div class="form-section card">
+                    <h3>Основная информация</h3>
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="id_first_name">Имя</label>
+                                {{ user_form.first_name }}
+                                {% if user_form.first_name.errors %}
+                                    <div class="field-error">
+                                        {% for error in user_form.first_name.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="id_last_name">Фамилия</label>
+                                {{ user_form.last_name }}
+                                {% if user_form.last_name.errors %}
+                                    <div class="field-error">
+                                        {% for error in user_form.last_name.errors %}
+                                            <span>{{ error }}</span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="id_email">Email</label>
+                            {{ user_form.email }}
+                            {% if user_form.email.errors %}
+                                <div class="field-error">
+                                    {% for error in user_form.email.errors %}
+                                        <span>{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                </div>
+
+                <!-- ФОРМА ДОПОЛНИТЕЛЬНЫХ ДАННЫХ -->
+                <div class="form-section card">
+                    <h3>Дополнительная информация</h3>
+                    
+                    <div class="form-group">
+                        <label for="id_phone">Телефон</label>
+                        {{ profile_form.phone }}
+                        {% if profile_form.phone.errors %}
+                            <div class="field-error">
+                                {% for error in profile_form.phone.errors %}
+                                    <span>{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_bio">О себе</label>
+                        {{ profile_form.bio }}
+                        {% if profile_form.bio.errors %}
+                            <div class="field-error">
+                                {% for error in profile_form.bio.errors %}
+                                    <span>{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-group">
+                        <label for="id_avatar">Аватар</label>
+                        {{ profile_form.avatar }}
+                        {% if profile_form.avatar.errors %}
+                            <div class="field-error">
+                                {% for error in profile_form.avatar.errors %}
+                                    <span>{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% if user.profile.avatar %}
+                            <div class="current-avatar">
+                                <small>Текущий аватар:</small>
+                                <img src="{{ user.profile.avatar.url }}" alt="Текущий аватар" class="avatar-preview">
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- СПЕЦИФИЧНАЯ ИНФОРМАЦИЯ ПО РОЛЯМ -->
+                {% if user.profile.role == 'STUDENT' and student %}
+                <div class="form-section card">
+                    <h3>Информация о студенте</h3>
+                    <div class="student-info">
+                        <div class="info-item">
+                            <strong>Факультет:</strong> {{ student.get_faculty_display_name }}
+                        </div>
+                        {% if student.birth_date %}
+                        <div class="info-item">
+                            <strong>Дата рождения:</strong> {{ student.birth_date|date:"d.m.Y" }}
+                        </div>
+                        <div class="info-item">
+                            <strong>Возраст:</strong> {{ student.get_age }} лет
+                        </div>
+                        {% endif %}
+                        <div class="info-item">
+                            <strong>Дата регистрации:</strong> {{ student.created_at|date:"d.m.Y" }}
+                        </div>
+                    </div>
+                </div>
+                {% elif user.profile.role == 'TEACHER' and instructor %}
+                <div class="form-section card">
+                    <h3>Информация о преподавателе</h3>
+                    <div class="teacher-info">
+                        {% if instructor.specialization %}
+                        <div class="info-item">
+                            <strong>Специализация:</strong> {{ instructor.specialization }}
+                        </div>
+                        {% endif %}
+                        {% if instructor.degree %}
+                        <div class="info-item">
+                            <strong>Ученая степень:</strong> {{ instructor.degree }}
+                        </div>
+                        {% endif %}
+                        <div class="info-item">
+                            <strong>Статус:</strong> 
+                            <span class="badge {% if instructor.is_active %}badge-active{% else %}badge-dropped{% endif %}">
+                                {{ instructor.is_active|yesno:"Активен,Неактивен" }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- КНОПКИ СОХРАНЕНИЯ -->
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        💾 Сохранить изменения
+                    </button>
+                    <a href="{% url 'dashboard' %}" class="btn btn-secondary">
+                        Отмена
+                    </a>
+                </div>
+                    </form>
+            </div>
+
+            <!-- ДОПОЛНИТЕЛЬНЫЕ СЕКЦИИ ПО РОЛЯМ -->
+            {% if user.profile.role == 'STUDENT' and enrollments %}
+            <div class="additional-section card">
+                <h3>Мои курсы</h3>
+                <div class="enrollments-list">
+                    {% for enrollment in enrollments %}
+                    <div class="enrollment-item">
+                        <div class="course-info">
+                            <h4>
+                                <a href="{% url 'course_detail' enrollment.course.slug %}">
+                                    {{ enrollment.course.title }}
+                                </a>
+                            </h4>
+                            <div class="enrollment-meta">
+                                <span class="badge badge-{{ enrollment.status|lower }}">
+                                    {{ enrollment.get_status_display }}
+                                </span>
+                                <span>Записан: {{ enrollment.enrolled_at|date:"d.m.Y" }}</span>
+                                {% if enrollment.completed_at %}
+                                <span>Завершен: {{ enrollment.completed_at|date:"d.m.Y" }}</span>
+                                {% endif %}
+                                {% if enrollment.grade %}
+                                <span>Оценка: {{ enrollment.grade }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% elif user.profile.role == 'TEACHER' and courses %}
+            <div class="additional-section card">
+                <h3>Мои курсы</h3>
+                <div class="courses-list">
+                    {% for course in courses %}
+                    <div class="course-item">
+                        <div class="course-info">
+                            <h4>
+                                <a href="{% url 'course_detail' course.slug %}">
+                                    {{ course.title }}
+                                </a>
+                            </h4>
+                            <div class="course-meta">
+                                <span>{{ course.enrolled_students_count }} студентов</span>
+                                <span>{{ course.available_spots }} свободных мест</span>
+                                <span>{{ course.get_level_display }}</span>
+                            </div>
+                        </div>
+                        <div class="course-actions">
+                            <a href="{% url 'teacher_course_management' course.slug %}" class="btn btn-sm">
+                                Управление
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

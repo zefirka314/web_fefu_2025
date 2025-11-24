@@ -1,0 +1,324 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- ПРИВЕТСТВИЕ И ОБЩАЯ СТАТИСТИКА -->
+    <div class="dashboard-header">
+        <div class="welcome-section">
+            <h2>Добро пожаловать, {{ instructor.first_name }}!</h2>
+            <p>Панель управления вашими учебными курсами и студентами</p>
+            {% if instructor.specialization %}
+            <div class="specialization-badge">
+                Специализация: {{ instructor.specialization }}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📚</div>
+                <div class="stat-content">
+                    <h3>{{ total_courses }}</h3>
+                    <p>Мои курсы</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👥</div>
+                <div class="stat-content">
+                    <h3>{{ total_students }}</h3>
+                    <p>Всего студентов</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-content">
+                    <h3>{{ completed_courses }}</h3>
+                    <p>Завершено курсов</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⭐</div>
+                <div class="stat-content">
+                    <h3>{{ average_rating|default:"-" }}</h3>
+                    <p>Средний рейтинг</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- БЫСТРЫЕ ДЕЙСТВИЯ -->
+    <div class="quick-actions-section">
+        <h3>Управление курсами</h3>
+        <div class="quick-actions-grid">
+            <a href="{% url 'course_list' %}" class="quick-action-card">
+                <div class="action-icon">➕</div>
+                <div class="action-content">
+                    <h4>Создать курс</h4>
+                    <p>Добавьте новый учебный материал в систему</p>
+                </div>
+            </a>
+            <a href="{% url 'profile' %}" class="quick-action-card">
+                <div class="action-icon">👤</div>
+                <div class="action-content">
+                    <h4>Профиль преподавателя</h4>
+                    <p>Обновите информацию о себе и специализации</p>
+                </div>
+            </a>
+            <a href="#" class="quick-action-card">
+                <div class="action-icon">📊</div>
+                <div class="action-content">
+                    <h4>Аналитика</h4>
+                    <p>Подробная статистика по успеваемости студентов</p>
+                </div>
+            </a>
+            <a href="{% url 'student_list' %}" class="quick-action-card">
+                <div class="action-icon">👨‍🎓</div>
+                <div class="action-content">
+                    <h4>Все студенты</h4>
+                    <p>Просмотр всех студентов системы</p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- МОИ КУРСЫ -->
+    <div class="courses-section">
+        <div class="section-header">
+            <h3>Мои курсы</h3>
+            <div class="section-actions">
+                <a href="{% url 'course_list' %}" class="btn btn-primary">Создать новый курс</a>
+            </div>
+        </div>
+
+        {% if course_stats %}
+            <div class="courses-grid">
+                {% for stats in course_stats %}
+                <div class="course-card">
+                    <div class="course-header">
+                        <h4>
+                            <a href="{% url 'course_detail' stats.course.slug %}">
+                                {{ stats.course.title }}
+                            </a>
+                        </h4>
+                        <div class="course-status">
+                            <span class="status-badge {% if stats.course.is_active %}status-active{% else %}status-inactive{% endif %}">
+                                {{ stats.course.is_active|yesno:"Активен,Неактивен" }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="course-info">
+                        <p class="course-description">
+                            {{ stats.course.description|truncatewords:15 }}
+                        </p>
+                        
+                        <div class="course-meta">
+                            <div class="meta-item">
+                                <strong>Уровень:</strong> {{ stats.course.get_level_display }}
+                            </div>
+                            <div class="meta-item">
+                                <strong>Продолжительность:</strong> {{ stats.course.duration }} часов
+                            </div>
+                            <div class="meta-item">
+                                <strong>Стоимость:</strong> 
+                                {% if stats.course.price > 0 %}
+                                    {{ stats.course.price }} руб.
+                                {% else %}
+                                    Бесплатно
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- СТАТИСТИКА КУРСА -->
+                    <div class="course-stats">
+                        <div class="stats-grid-mini">
+                            <div class="stat-mini">
+                                <div class="stat-value">{{ stats.student_count }}</div>
+                                <div class="stat-label">Студентов</div>
+                            </div>
+                            <div class="stat-mini">
+                                <div class="stat-value">{{ stats.available_spots }}</div>
+                                <div class="stat-label">Свободно</div>
+                            </div>
+                            <div class="stat-mini">
+                                <div class="stat-value">{{ stats.completion_rate }}</div>
+                                <div class="stat-label">Завершили</div>
+                            </div>
+                        </div>
+                        
+                        <div class="enrollment-progress">
+                            <div class="progress">
+                                <div class="progress-bar" style="width: {% widthratio stats.student_count stats.course.max_students 100 %}%"></div>
+                            </div>
+                            <div class="progress-text">
+                                Заполненность: {{ stats.student_count }}/{{ stats.course.max_students }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="course-actions">
+                        <a href="{% url 'teacher_course_management' stats.course.slug %}" class="btn btn-primary">
+                            Управление курсом
+                        </a>
+                        <a href="{% url 'course_detail' stats.course.slug %}" class="btn btn-outline">
+                            Просмотр
+                        </a>
+                        <button class="btn btn-outline" onclick="toggleCourseStatus({{ stats.course.id }})">
+                            {{ stats.course.is_active|yesno:"Деактивировать,Активировать" }}
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">📚</div>
+                <h4>У вас пока нет созданных курсов</h4>
+                <p>Создайте свой первый курс и начните преподавать в нашей системе</p>
+                <a href="{% url 'course_list' %}" class="btn btn-primary">Создать курс</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- ПОСЛЕДНИЕ АКТИВНОСТИ -->
+    <div class="activities-section">
+        <div class="activities-layout">
+            <!-- НЕДАВНИЕ ЗАПИСИ -->
+            <div class="recent-enrollments">
+                <h3>Последние записи на курсы</h3>
+                <div class="enrollments-list">
+                    {% for enrollment in recent_enrollments %}
+                    <div class="enrollment-item">
+                        <div class="student-avatar">
+                            {% if enrollment.student.user.profile.avatar %}
+                                <img src="{{ enrollment.student.user.profile.avatar.url }}" alt="Аватар">
+                            {% else %}
+                                <div class="avatar-default-sm">
+                                    {{ enrollment.student.first_name|first }}{{ enrollment.student.last_name|first }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="enrollment-info">
+                            <div class="student-name">
+                                <a href="{% url 'student_profile' enrollment.student.id %}">
+                                    {{ enrollment.student.full_name }}
+                                </a>
+                            </div>
+                            <div class="course-name">
+                                записался на 
+                                <a href="{% url 'course_detail' enrollment.course.slug %}">
+                                    {{ enrollment.course.title }}
+                                </a>
+                            </div>
+                            <div class="enrollment-date">
+                                {{ enrollment.enrolled_at|timesince }} назад
+                            </div>
+                        </div>
+                        <div class="enrollment-status">
+                            <span class="status-badge badge-{{ enrollment.status|lower }}">
+                                {{ enrollment.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-list">
+                        <p>Нет recent записей на курсы</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- БЛИЖАЙШИЕ ДЕДЛАЙНЫ -->
+            <div class="upcoming-deadlines">
+                <h3>Ближайшие события</h3>
+                <div class="deadlines-list">
+                    <div class="deadline-item">
+                        <div class="deadline-date">
+                            <span class="date-day">15</span>
+                            <span class="date-month">Дек</span>
+                        </div>
+                        <div class="deadline-info">
+                            <div class="deadline-title">Сдача проекта по Python</div>
+                            <div class="deadline-course">Основы программирования</div>
+                            <div class="deadline-students">12 студентов</div>
+                        </div>
+                    </div>
+                    <div class="deadline-item">
+                        <div class="deadline-date">
+                            <span class="date-day">20</span>
+                            <span class="date-month">Дек</span>
+                        </div>
+                        <div class="deadline-info">
+                            <div class="deadline-title">Экзамен по веб-разработке</div>
+                            <div class="deadline-course">Современные веб-технологии</div>
+                            <div class="deadline-students">8 студентов</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- БЫСТРЫЙ ПРОСМОТР СТУДЕНТОВ -->
+    <div class="students-overview">
+        <div class="section-header">
+            <h3>Студенты на моих курсах</h3>
+            <a href="{% url 'student_list' %}" class="btn btn-outline">Все студенты</a>
+        </div>
+        
+        <div class="students-stats">
+            <div class="stats-cards">
+                <div class="stat-card-sm">
+                    <div class="stat-value">{{ active_students }}</div>
+                    <div class="stat-label">Активных студентов</div>
+                </div>
+                <div class="stat-card-sm">
+                    <div class="stat-value">{{ completed_students }}</div>
+                    <div class="stat-label">Завершили курсы</div>
+                </div>
+                <div class="stat-card-sm">
+                    <div class="stat-value">{{ average_grade|default:"-" }}</div>
+                    <div class="stat-label">Средняя оценка</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Анимация прогресс-баров
+    const progressBars = document.querySelectorAll('.progress-bar');
+    progressBars.forEach(bar => {
+        const width = bar.style.width;
+        bar.style.width = '0';
+        setTimeout(() => {
+            bar.style.width = width;
+        }, 100);
+    });
+
+    // Переключение статуса курса
+    window.toggleCourseStatus = function(courseId) {
+        if (confirm('Вы уверены, что хотите изменить статус курса?')) {
+            // Здесь будет AJAX запрос для изменения статуса
+            console.log('Changing status for course:', courseId);
+        }
+    };
+
+    // Обновление статистики в реальном времени
+    function updateStats() {
+        // Можно добавить AJAX запросы для обновления статистики
+        console.log('Updating teacher dashboard stats...');
+    }
+
+    // Обновляем статистику каждые 30 секунд
+    setInterval(updateStats, 30000);
+});
+</script>
+{% endblock %}

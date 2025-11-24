@@ -1,0 +1,245 @@
+{% extends "fefu_lab/base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="form-container">
+        <div class="form-header">
+            <h2>Создание аккаунта</h2>
+            <p>Присоединяйтесь к учебному сообществу ДВФУ</p>
+        </div>
+
+        <!-- ВЫВОД СООБЩЕНИЙ -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- ФОРМА РЕГИСТРАЦИИ -->
+        <form method="post" enctype="multipart/form-data" class="registration-form">
+            {% csrf_token %}
+            
+            <!-- ОСНОВНАЯ ИНФОРМАЦИЯ -->
+            <div class="form-section">
+                <h3>Основная информация</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="id_first_name">Имя *</label>
+                        <input type="text" name="first_name" id="id_first_name" class="form-control" 
+                               value="{{ form.first_name.value|default:'' }}" required
+                               placeholder="Введите ваше имя">
+                        {% if form.first_name.errors %}
+                            <div class="field-error">
+                                {% for error in form.first_name.errors %}
+                                    <span>{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="id_last_name">Фамилия *</label>
+                        <input type="text" name="last_name" id="id_last_name" class="form-control" 
+                               value="{{ form.last_name.value|default:'' }}" required
+                               placeholder="Введите вашу фамилию">
+                        {% if form.last_name.errors %}
+                            <div class="field-error">
+                                {% for error in form.last_name.errors %}
+                                    <span>{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="id_username">Имя пользователя *</label>
+                    <input type="text" name="username" id="id_username" class="form-control" 
+                           value="{{ form.username.value|default:'' }}" required
+                           placeholder="Придумайте уникальное имя пользователя">
+                    <small class="form-text">Это имя будет использоваться для входа в систему</small>
+                    {% if form.username.errors %}
+                        <div class="field-error">
+                            {% for error in form.username.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="id_email">Email адрес *</label>
+                    <input type="email" name="email" id="id_email" class="form-control" 
+                           value="{{ form.email.value|default:'' }}" required
+                           placeholder="example@fefu.ru">
+                    <small class="form-text">На этот email будут приходить уведомления</small>
+                    {% if form.email.errors %}
+                        <div class="field-error">
+                            {% for error in form.email.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ВЫБОР РОЛИ -->
+            <div class="form-section">
+                <h3>Роль в системе</h3>
+                
+                <div class="form-group">
+                    <label for="id_role">Я регистрируюсь как *</label>
+                    <select name="role" id="id_role" class="form-control" required>
+                        <option value="">Выберите вашу роль</option>
+                        <option value="STUDENT" {% if form.role.value == 'STUDENT' %}selected{% endif %}>Студент</option>
+                        <option value="TEACHER" {% if form.role.value == 'TEACHER' %}selected{% endif %}>Преподаватель</option>
+                        <option value="ADMIN" {% if form.role.value == 'ADMIN' %}selected{% endif %}>Администратор</option>
+                    </select>
+                    <small class="form-text">
+                        • Студент: доступ к курсам и обучению<br>
+                        • Преподаватель: создание и управление курсами<br>
+                        • Администратор: полный доступ к системе
+                    </small>
+                    {% if form.role.errors %}
+                        <div class="field-error">
+                            {% for error in form.role.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- БЕЗОПАСНОСТЬ -->
+            <div class="form-section">
+                <h3>Безопасность аккаунта</h3>
+                
+                <div class="form-group">
+                    <label for="id_password1">Пароль *</label>
+                    <input type="password" name="password1" id="id_password1" class="form-control" required
+                           placeholder="Создайте надежный пароль">
+                    <small class="form-text">
+                        Пароль должен содержать:
+                        <ul>
+                            <li>Минимум 8 символов</li>
+                            <li>Не состоять только из цифр</li>
+                            <li>Не быть слишком простым</li>
+                        </ul>
+                    </small>
+                    {% if form.password1.errors %}
+                        <div class="field-error">
+                            {% for error in form.password1.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="id_password2">Подтверждение пароля *</label>
+                    <input type="password" name="password2" id="id_password2" class="form-control" required
+                           placeholder="Повторите ваш пароль">
+                    {% if form.password2.errors %}
+                        <div class="field-error">
+                            {% for error in form.password2.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ -->
+            <div class="form-section">
+                <h3>Дополнительная информация</h3>
+                
+                <div class="form-group">
+                    <label for="id_phone">Номер телефона</label>
+                    <input type="tel" name="phone" id="id_phone" class="form-control" 
+                           value="{{ form.phone.value|default:'' }}"
+                           placeholder="+7 (XXX) XXX-XX-XX">
+                    {% if form.phone.errors %}
+                        <div class="field-error">
+                            {% for error in form.phone.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="id_bio">О себе</label>
+                    <textarea name="bio" id="id_bio" class="form-control" rows="4"
+                              placeholder="Расскажите о своих интересах, опыте и целях...">{{ form.bio.value|default:'' }}</textarea>
+                    {% if form.bio.errors %}
+                        <div class="field-error">
+                            {% for error in form.bio.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label for="id_avatar">Аватар</label>
+                    <input type="file" name="avatar" id="id_avatar" class="form-control" 
+                           accept="image/*">
+                    <small class="form-text">Максимальный размер: 2MB. Разрешены: JPG, PNG, GIF</small>
+                    {% if form.avatar.errors %}
+                        <div class="field-error">
+                            {% for error in form.avatar.errors %}
+                                <span>{{ error }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- СОГЛАШЕНИЯ -->
+            <div class="form-section">
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="id_agree_terms" required>
+                        <label class="form-check-label" for="id_agree_terms">
+                            Я соглашаюсь с <a href="#" target="_blank">условиями использования</a> 
+                            и <a href="#" target="_blank">политикой конфиденциальности</a> *
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="id_agree_newsletter">
+                        <label class="form-check-label" for="id_agree_newsletter">
+                            Я хочу получать уведомления о новых курсах и событиях
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- КНОПКИ -->
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-lg btn-block">
+                    Создать аккаунт
+                </button>
+                
+                <div class="text-center mt-3">
+                    <small>Нажимая кнопку, вы подтверждаете свое согласие с правилами системы</small>
+                </div>
+            </div>
+        </form>
+
+        <!-- ССЫЛКИ -->
+        <div class="form-footer">
+            <p>Уже есть аккаунт? <a href="{% url 'login' %}">Войдите здесь</a></p>
+            <p><a href="{% url 'home' %}">Вернуться на главную страницу</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
