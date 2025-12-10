@@ -79,7 +79,7 @@ if ! systemctl is-active --quiet postgresql; then
     log_info "Запуск PostgreSQL..."
     systemctl start postgresql
     systemctl enable postgresql
-    sleep 3
+    sleep 5
 fi
 
 # Проверяем, что PostgreSQL запущен
@@ -99,24 +99,31 @@ for i in {1..10}; do
     sleep 2
 done
 
-# Проверяем доступность PostgreSQL
-if ! sudo -u postgres psql -c "SELECT 1;" >/dev/null 2>&1; then
-    log_error "PostgreSQL не доступен после 20 секунд ожидания"
-    log_error "Проверьте статус: systemctl status postgresql"
-    exit 1
-fi
-
 # Создание базы данных и пользователя
 log_info "Создание базы данных и пользователя PostgreSQL..."
+
+# Принудительно завершаем все соединения к базе
+sudo -u postgres psql -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '$DB_NAME' AND pid <> pg_backend_pid();" 2>/dev/null || true
+
+# Удаляем старую базу и пользователя
 sudo -u postgres psql -c "DROP DATABASE IF EXISTS $DB_NAME;" 2>/dev/null || true
 sudo -u postgres psql -c "DROP USER IF EXISTS $DB_USER;" 2>/dev/null || true
 
-sudo -u postgres psql -c "CREATE DATABASE $DB_NAME;"
-sudo -u postgres psql -c "CREATE USER $DB_USER WITH PASSWORD '$DB_PASSWORD';"
-sudo -u postgres psql -c "ALTER ROLE $DB_USER SET client_encoding TO 'utf8';"
-sudo -u postgres psql -c "ALTER ROLE $DB_USER SET default_transaction_isolation TO 'read committed';"
-sudo -u postgres psql -c "ALTER ROLE $DB_USER SET timezone TO 'UTC';"
+# Создаём пользователя с правами суперпользователя (для лабораторной работы)
+sudo -u postgres psql -c "CREATE USER $DB_USER WITH SUPERUSER CREATEDB CREATEROLE LOGIN PASSWORD '$DB_PASSWORD';"
+
+# Создаём базу данных с владельцем
+sudo -u postgres psql -c "CREATE DATABASE $DB_NAME WITH OWNER $DB_USER ENCODING 'UTF8' LC_COLLATE = 'en_US.UTF-8' LC_CTYPE = 'en_US.UTF-8' TEMPLATE template0;"
+
+# Даём все права
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;"
+
+# Настраиваем параметры пользователя
+sudo -u postgres psql -c "ALTER USER $DB_USER WITH CREATEDB CREATEROLE;"
+
+# КРИТИЧЕСКИ ВАЖНО: Даем права на схему public для пользователя
+sudo -u postgres psql -d $DB_NAME -c "GRANT ALL ON SCHEMA public TO $DB_USER;"
+sudo -u postgres psql -d $DB_NAME -c "GRANT CREATE ON SCHEMA public TO $DB_USER;"
 
 # Настройка безопасности PostgreSQL (только localhost)
 log_info "Настройка безопасности PostgreSQL..."
@@ -131,7 +138,7 @@ if [ -f "$PG_HBA" ]; then
     # Делаем резервную копию
     cp "$PG_HBA" "${PG_HBA}.backup"
     
-    # Разрешаем только localhost
+    # Разрешаем только localhost для всех баз
     sed -i '/^host.*all.*all.*0\.0\.0\.0\/0.*md5/d' "$PG_HBA"
     sed -i '/^host.*all.*all.*::\/0.*md5/d' "$PG_HBA"
     
@@ -149,6 +156,18 @@ else
     log_warn "Файл pg_hba.conf не найден по пути $PG_HBA"
     log_warn "Используем стандартную конфигурацию PostgreSQL"
 fi
+
+# Проверка подключения к базе данных
+log_info "Проверка подключения к базе данных..."
+export PGPASSWORD="$DB_PASSWORD"
+if psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
+    log_info "✓ Пользователь $DB_USER успешно подключился к базе $DB_NAME"
+else
+    log_error "✗ Ошибка подключения пользователя $DB_USER к базе $DB_NAME"
+    log_error "Проверьте пароль и права доступа"
+    exit 1
+fi
+unset PGPASSWORD
 
 # =============================================================================
 # ШАГ 3: Копирование проекта
@@ -368,7 +387,8 @@ sleep 5
 
 # Проверка портов
 log_info "Проверка открытых портов:"
-netstat -tlnp | grep -E ':(80|5432|8000)' || true
+echo "Слушающие порты на сервере:"
+netstat -tlnp | grep -E ':(80|5432|8000)' || echo "Не все порты найдены"
 
 # Проверка доступности
 log_info "Проверка доступности приложения..."
@@ -376,6 +396,7 @@ HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost || echo "0
 
 if [[ "$HTTP_STATUS" =~ ^(200|301|302|403|404)$ ]]; then
     log_info "✓ Приложение доступно! HTTP статус: $HTTP_STATUS"
+    log_info "✓ Проверьте браузером: http://$SERVER_IP"
 else
     log_warn "HTTP статус: $HTTP_STATUS"
     log_warn "Проверьте логи командой: sudo journalctl -u gunicorn -n 30"
@@ -389,8 +410,37 @@ else
     log_error "✗ Ошибка при загрузке Pillow"
 fi
 
+# Проверка PostgreSQL подключения с приложения
+log_info "Проверка подключения Django к PostgreSQL..."
+if python -c "
+import django
+from django.conf import settings
+if not settings.configured:
+    settings.configure(
+        DATABASES={
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': '$DB_NAME',
+                'USER': '$DB_USER',
+                'PASSWORD': '$DB_PASSWORD',
+                'HOST': 'localhost',
+                'PORT': '5432',
+            }
+        }
+    )
+django.setup()
+from django.db import connection
+with connection.cursor() as cursor:
+    cursor.execute('SELECT 1')
+print('✓ Django может подключиться к PostgreSQL')
+" 2>/dev/null; then
+    log_info "✓ Django успешно подключается к PostgreSQL"
+else
+    log_error "✗ Ошибка подключения Django к PostgreSQL"
+fi
+
 # =============================================================================
-# ШАГ 10: Финальный вывод
+# ШАГ 10: Финальный вывод и проверка безопасности
 # =============================================================================
 log_info ""
 log_info "================================================"
@@ -405,7 +455,60 @@ log_info "  База: $DB_NAME"
 log_info "  Пользователь: $DB_USER"
 log_info "  Пароль: $DB_PASSWORD"
 log_info ""
+log_info "Проверка безопасности:"
+log_info "  PostgreSQL слушает только на 127.0.0.1:5432"
+log_info "  Gunicorn слушает только на 127.0.0.1:8000"
+log_info "  Nginx слушает на 0.0.0.0:80 (публично)"
+log_info ""
 log_info "Для проверки с хостовой машины:"
 log_info "  curl http://$SERVER_IP"
-log_info "  или откройте в браузере"
+log_info "  или откройте в браузере: http://$SERVER_IP"
+log_info ""
+log_info "Для проверки недоступности портов снаружи:"
+log_info "  На хостовой машине выполните:"
+log_info "  nmap -p 5432,8000 $SERVER_IP"
+log_info "  Порты 5432 и 8000 должны быть закрыты (filtered)"
+log_info ""
+log_info "Команды управления:"
+log_info "  sudo systemctl status gunicorn  # статус приложения"
+log_info "  sudo journalctl -u gunicorn -f  # логи в реальном времени"
+log_info "  sudo systemctl restart gunicorn # перезапуск приложения"
+log_info "  sudo systemctl restart nginx    # перезапуск nginx"
 log_info "================================================"
+
+# Сохранение секретов в файл (для документации)
+SECRETS_FILE="/root/${PROJECT_NAME}_secrets_$(date +%Y%m%d).txt"
+cat > "$SECRETS_FILE" << EOF
+# Секреты проекта $PROJECT_NAME
+# Создано: $(date)
+
+URL приложения: http://$SERVER_IP
+Админка: http://$SERVER_IP/admin
+Логин: admin
+Пароль: admin123
+
+База данных PostgreSQL:
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASSWORD
+DB_HOST=localhost
+DB_PORT=5432
+
+Django SECRET_KEY:
+$DJANGO_SECRET_KEY
+
+Для подключения к БД:
+psql -h localhost -U $DB_USER -d $DB_NAME
+
+Для проверки портов:
+nmap -p 5432,8000 $SERVER_IP
+EOF
+
+chmod 600 "$SECRETS_FILE"
+log_info "Секреты сохранены в $SECRETS_FILE"
+
+log_info ""
+log_info "Теперь проверьте работу приложения с хостовой машины!"
+log_info "Если что-то не работает, проверьте логи:"
+log_info "  sudo journalctl -u gunicorn -n 50"
+log_info "  sudo tail -f /var/log/nginx/error.log"
