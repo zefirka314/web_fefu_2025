@@ -74,11 +74,40 @@ apt-get install -y \
 # =============================================================================
 log_info "Шаг 2: Настройка PostgreSQL..."
 
-# Остановка и перезапуск для гарантии
-systemctl stop postgresql 2>/dev/null || true
-sleep 2
+# Запускаем PostgreSQL если не запущен
+if ! systemctl is-active --quiet postgresql; then
+    log_info "Запуск PostgreSQL..."
+    systemctl start postgresql
+    systemctl enable postgresql
+    sleep 3
+fi
+
+# Проверяем, что PostgreSQL запущен
+if ! systemctl is-active --quiet postgresql; then
+    log_error "PostgreSQL не запускается. Проверьте логи: journalctl -u postgresql"
+    exit 1
+fi
+
+# Ждем, чтобы PostgreSQL точно запустился
+log_info "Ожидание полного запуска PostgreSQL..."
+for i in {1..10}; do
+    if sudo -u postgres psql -c "SELECT 1;" >/dev/null 2>&1; then
+        log_info "PostgreSQL запущен и готов к работе"
+        break
+    fi
+    log_info "Ожидание PostgreSQL... ($i/10)"
+    sleep 2
+done
+
+# Проверяем доступность PostgreSQL
+if ! sudo -u postgres psql -c "SELECT 1;" >/dev/null 2>&1; then
+    log_error "PostgreSQL не доступен после 20 секунд ожидания"
+    log_error "Проверьте статус: systemctl status postgresql"
+    exit 1
+fi
 
 # Создание базы данных и пользователя
+log_info "Создание базы данных и пользователя PostgreSQL..."
 sudo -u postgres psql -c "DROP DATABASE IF EXISTS $DB_NAME;" 2>/dev/null || true
 sudo -u postgres psql -c "DROP USER IF EXISTS $DB_USER;" 2>/dev/null || true
 
@@ -91,11 +120,18 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;
 
 # Настройка безопасности PostgreSQL (только localhost)
 log_info "Настройка безопасности PostgreSQL..."
-PG_VERSION=$(psql --version 2>/dev/null | awk '{print $3}' | cut -d'.' -f1)
+PG_VERSION=$(ls /etc/postgresql/ 2>/dev/null | head -n1)
+if [ -z "$PG_VERSION" ]; then
+    PG_VERSION="14"  # Версия по умолчанию для Ubuntu 22.04
+fi
+
 PG_HBA="/etc/postgresql/$PG_VERSION/main/pg_hba.conf"
 
 if [ -f "$PG_HBA" ]; then
-    # Разрешаем только localhost для всех баз
+    # Делаем резервную копию
+    cp "$PG_HBA" "${PG_HBA}.backup"
+    
+    # Разрешаем только localhost
     sed -i '/^host.*all.*all.*0\.0\.0\.0\/0.*md5/d' "$PG_HBA"
     sed -i '/^host.*all.*all.*::\/0.*md5/d' "$PG_HBA"
     
@@ -104,11 +140,14 @@ if [ -f "$PG_HBA" ]; then
         echo "host    all             all             127.0.0.1/32            md5" >> "$PG_HBA"
     fi
     
+    # Добавляем правило для нашей базы
+    echo "host    $DB_NAME         $DB_USER         127.0.0.1/32            md5" >> "$PG_HBA"
+    
     systemctl restart postgresql
     log_info "PostgreSQL перезапущен с настройками безопасности"
 else
-    log_warn "Файл pg_hba.conf не найден. Используем стандартную конфигурацию."
-    systemctl restart postgresql
+    log_warn "Файл pg_hba.conf не найден по пути $PG_HBA"
+    log_warn "Используем стандартную конфигурацию PostgreSQL"
 fi
 
 # =============================================================================
@@ -124,7 +163,6 @@ fi
 # Создаем временную директорию для проекта
 log_info "Копирование файлов проекта..."
 # ВАЖНО: Предполагается, что скрипт запускается из директории с проектом
-# или вы указываете правильный путь
 SOURCE_DIR=$(pwd)
 if [ ! -f "$SOURCE_DIR/manage.py" ]; then
     log_error "Файл manage.py не найден в текущей директории!"
@@ -185,7 +223,7 @@ python manage.py migrate --noinput
 
 # Создание суперпользователя
 log_info "Создание суперпользователя Django..."
-cat << EOF | python manage.py shell
+cat << EOF | python manage.py shell 2>/dev/null || log_warn "Ошибка при создании суперпользователя"
 from django.contrib.auth import get_user_model
 User = get_user_model()
 if not User.objects.filter(username='admin').exists():
@@ -251,7 +289,7 @@ systemctl enable gunicorn
 systemctl start gunicorn
 
 log_info "Проверка статуса Gunicorn..."
-sleep 2
+sleep 3
 if systemctl is-active --quiet gunicorn; then
     log_info "✓ Gunicorn запущен успешно"
 else
