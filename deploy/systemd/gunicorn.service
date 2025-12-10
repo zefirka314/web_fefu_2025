@@ -1,0 +1,40 @@
+[Unit]
+Description=FEFU Lab Gunicorn Service
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/fefu_lab
+
+# Environment-переменные для Django
+Environment=DJANGO_ENV=production
+Environment=DJANGO_SECRET_KEY=ваш_секретный_ключ
+Environment=DB_NAME=fefu_lab_db
+Environment=DB_USER=fefu_user
+Environment=DB_PASSWORD=ваш_пароль
+Environment=DB_HOST=localhost
+Environment=DB_PORT=5432
+Environment=ALLOWED_HOSTS=localhost,127.0.0.1,ваш_ip
+Environment=CSRF_TRUSTED_ORIGINS=http://ваш_ip
+
+# PATH для виртуального окружения
+Environment=PATH=/var/www/fefu_lab/venv/bin
+
+# Команда запуска Gunicorn
+ExecStart=/var/www/fefu_lab/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    --access-logfile /var/log/gunicorn/access.log \
+    --error-logfile /var/log/gunicorn/error.log \
+    your_project.wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
