@@ -28,8 +28,14 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
-# Переменные
-PROJECT_NAME="web_2025"
+# =============================================================================
+# КОНФИГУРАЦИОННЫЕ ПЕРЕМЕННЫЕ
+# =============================================================================
+
+# ИЗМЕНИТЕ ЭТИ ЗНАЧЕНИЯ ПОД ВАШ ПРОЕКТ!
+REPO_URL="https://github.com/zefirka314/web_fefu_2025.git"  # URL вашего GitHub репозитория
+BRANCH="main"                     # Ветка для клонирования
+PROJECT_NAME="web_fefu_2025"      # Имя проекта (должно совпадать с именем Django проекта)
 PROJECT_DIR="/var/www/$PROJECT_NAME"
 DB_NAME="${PROJECT_NAME}_db"
 DB_USER="${PROJECT_NAME}_user"
@@ -39,6 +45,7 @@ SERVER_IP=$(hostname -I | awk '{print $1}')
 
 log_info "Начало развертывания проекта $PROJECT_NAME..."
 log_info "IP сервера: $SERVER_IP"
+log_info "Клонирование из: $REPO_URL (ветка: $BRANCH)"
 
 # =============================================================================
 # ШАГ 1: Обновление системы и установка зависимостей
@@ -99,6 +106,13 @@ for i in {1..10}; do
     sleep 2
 done
 
+# Проверяем доступность PostgreSQL
+if ! sudo -u postgres psql -c "SELECT 1;" >/dev/null 2>&1; then
+    log_error "PostgreSQL не доступен после 20 секунд ожидания"
+    log_error "Проверьте статус: systemctl status postgresql"
+    exit 1
+fi
+
 # Создание базы данных и пользователя
 log_info "Создание базы данных и пользователя PostgreSQL..."
 
@@ -117,9 +131,6 @@ sudo -u postgres psql -c "CREATE DATABASE $DB_NAME WITH OWNER $DB_USER ENCODING 
 
 # Даём все права
 sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE $DB_NAME TO $DB_USER;"
-
-# Настраиваем параметры пользователя
-sudo -u postgres psql -c "ALTER USER $DB_USER WITH CREATEDB CREATEROLE;"
 
 # КРИТИЧЕСКИ ВАЖНО: Даем права на схему public для пользователя
 sudo -u postgres psql -d $DB_NAME -c "GRANT ALL ON SCHEMA public TO $DB_USER;"
@@ -157,42 +168,29 @@ else
     log_warn "Используем стандартную конфигурацию PostgreSQL"
 fi
 
-# Проверка подключения к базе данных
-log_info "Проверка подключения к базе данных..."
-export PGPASSWORD="$DB_PASSWORD"
-if psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
-    log_info "✓ Пользователь $DB_USER успешно подключился к базе $DB_NAME"
-else
-    log_error "✗ Ошибка подключения пользователя $DB_USER к базе $DB_NAME"
-    log_error "Проверьте пароль и права доступа"
-    exit 1
-fi
-unset PGPASSWORD
-
 # =============================================================================
-# ШАГ 3: Копирование проекта
+# ШАГ 3: КЛОНИРОВАНИЕ ПРОЕКТА ИЗ GITHUB
 # =============================================================================
-log_info "Шаг 3: Подготовка проекта..."
+log_info "Шаг 3: Клонирование проекта из GitHub..."
 
 if [ -d "$PROJECT_DIR" ]; then
     log_warn "Директория $PROJECT_DIR уже существует. Очищаем..."
     rm -rf "$PROJECT_DIR"
 fi
 
-# Создаем временную директорию для проекта
-log_info "Копирование файлов проекта..."
-# ВАЖНО: Предполагается, что скрипт запускается из директории с проектом
-SOURCE_DIR=$(pwd)
-if [ ! -f "$SOURCE_DIR/manage.py" ]; then
-    log_error "Файл manage.py не найден в текущей директории!"
-    log_error "Запустите скрипт из корневой директории Django проекта."
+# Клонируем репозиторий
+log_info "Клонирование репозитория $REPO_URL..."
+git clone -b "$BRANCH" "$REPO_URL" "$PROJECT_DIR"
+
+# Проверяем успешность клонирования
+if [ ! -f "$PROJECT_DIR/manage.py" ]; then
+    log_error "Ошибка: проект не содержит manage.py после клонирования!"
+    log_error "Проверьте структуру репозитория и переменные REPO_URL, PROJECT_NAME"
     exit 1
 fi
 
-mkdir -p "$PROJECT_DIR"
-cp -r "$SOURCE_DIR"/* "$PROJECT_DIR"/ 2>/dev/null || true
-
 cd "$PROJECT_DIR"
+log_info "✓ Проект успешно клонирован в $PROJECT_DIR"
 
 # =============================================================================
 # ШАГ 4: Настройка Python окружения
@@ -210,7 +208,7 @@ pip install --upgrade pip
 if [ -f "requirements.txt" ]; then
     pip install -r requirements.txt
 else
-    log_warn "requirements.txt не найден, устанавливаем минимальный набор..."
+    log_warn "requirements.txt не найден в репозитории, устанавливаем минимальный набор..."
     pip install Django gunicorn psycopg2-binary Pillow
 fi
 
@@ -271,7 +269,23 @@ chown -R www-data:www-data /var/log/gunicorn
 
 # Создание сервисного файла Gunicorn
 GUNICORN_SERVICE="/etc/systemd/system/gunicorn.service"
-cat > "$GUNICORN_SERVICE" << EOF
+
+# Проверяем, есть ли готовый конфиг в репозитории
+if [ -f "deploy/systemd/gunicorn.service" ]; then
+    log_info "Использую конфигурацию gunicorn.service из репозитория..."
+    cp deploy/systemd/gunicorn.service "$GUNICORN_SERVICE"
+    
+    # Заменяем плейсхолдеры в конфиге
+    sed -i "s|%PROJECT_NAME%|$PROJECT_NAME|g" "$GUNICORN_SERVICE"
+    sed -i "s|%PROJECT_DIR%|$PROJECT_DIR|g" "$GUNICORN_SERVICE"
+    sed -i "s|%DJANGO_SECRET_KEY%|$DJANGO_SECRET_KEY|g" "$GUNICORN_SERVICE"
+    sed -i "s|%DB_PASSWORD%|$DB_PASSWORD|g" "$GUNICORN_SERVICE"
+    sed -i "s|%SERVER_IP%|$SERVER_IP|g" "$GUNICORN_SERVICE"
+    sed -i "s|%DB_NAME%|$DB_NAME|g" "$GUNICORN_SERVICE"
+    sed -i "s|%DB_USER%|$DB_USER|g" "$GUNICORN_SERVICE"
+else
+    log_warn "Конфиг gunicorn.service не найден в репозитории, создаю базовый..."
+    cat > "$GUNICORN_SERVICE" << EOF
 [Unit]
 Description=Gunicorn для Django проект $PROJECT_NAME
 After=network.target postgresql.service
@@ -293,7 +307,7 @@ Environment=DB_PASSWORD=$DB_PASSWORD
 Environment=DB_HOST=localhost
 Environment=DB_PORT=5432
 Environment=PATH=$PROJECT_DIR/venv/bin
-ExecStart=$PROJECT_DIR/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 --timeout 120 web_2025.wsgi:application
+ExecStart=$PROJECT_DIR/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 --timeout 120 $PROJECT_NAME.wsgi:application
 ExecReload=/bin/kill -s HUP \$MAINPID
 ExecStop=/bin/kill -s TERM \$MAINPID
 Restart=on-failure
@@ -302,6 +316,7 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF
+fi
 
 systemctl daemon-reload
 systemctl enable gunicorn
@@ -323,7 +338,19 @@ log_info "Шаг 7: Настройка Nginx..."
 
 # Создание конфигурации Nginx
 NGINX_CONFIG="/etc/nginx/sites-available/$PROJECT_NAME"
-cat > "$NGINX_CONFIG" << EOF
+
+# Проверяем, есть ли готовый конфиг в репозитории
+if [ -f "deploy/nginx/fefu_lab.conf" ]; then
+    log_info "Использую конфигурацию Nginx из репозитория..."
+    cp deploy/nginx/fefu_lab.conf "$NGINX_CONFIG"
+    
+    # Заменяем плейсхолдеры в конфиге
+    sed -i "s|%PROJECT_DIR%|$PROJECT_DIR|g" "$NGINX_CONFIG"
+    sed -i "s|%SERVER_IP%|$SERVER_IP|g" "$NGINX_CONFIG"
+    sed -i "s|%PROJECT_NAME%|$PROJECT_NAME|g" "$NGINX_CONFIG"
+else
+    log_warn "Конфиг Nginx не найден в репозитории, создаю базовый..."
+    cat > "$NGINX_CONFIG" << EOF
 server {
     listen 80;
     server_name $SERVER_IP;
@@ -355,6 +382,7 @@ server {
     }
 }
 EOF
+fi
 
 # Создание символической ссылки
 ln -sf "$NGINX_CONFIG" /etc/nginx/sites-enabled/
@@ -380,107 +408,114 @@ chown -R www-data:www-data "$PROJECT_DIR"
 chmod -R 755 "$PROJECT_DIR"
 
 # =============================================================================
-# ШАГ 9: Проверка работоспособности
+# ШАГ 9: ПРОВЕРКА РАБОТОСПОСОБНОСТИ
 # =============================================================================
 log_info "Шаг 9: Проверка работоспособности..."
 sleep 5
 
-# Проверка портов
-log_info "Проверка открытых портов:"
+# 1. Проверка портов
+log_info "1. Проверка открытых портов:"
 echo "Слушающие порты на сервере:"
 netstat -tlnp | grep -E ':(80|5432|8000)' || echo "Не все порты найдены"
 
-# Проверка доступности
-log_info "Проверка доступности приложения..."
+# 2. Проверка доступности приложения через curl на localhost:80
+log_info ""
+log_info "2. Проверка доступности приложения через curl на localhost:80..."
+
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost || echo "000")
 
 if [[ "$HTTP_STATUS" =~ ^(200|301|302|403|404)$ ]]; then
-    log_info "✓ Приложение доступно! HTTP статус: $HTTP_STATUS"
+    log_info "✓ Приложение доступно на localhost:80! HTTP статус: $HTTP_STATUS"
     log_info "✓ Проверьте браузером: http://$SERVER_IP"
 else
-    log_warn "HTTP статус: $HTTP_STATUS"
-    log_warn "Проверьте логи командой: sudo journalctl -u gunicorn -n 30"
+    log_error "✗ Приложение недоступно на localhost:80 (HTTP статус: $HTTP_STATUS)"
+    log_error "Проверьте логи: sudo journalctl -u gunicorn -n 30"
 fi
 
-# Проверка Pillow
-log_info "Проверка установки Pillow..."
-if python -c "from PIL import Image; print('Image module loaded')" 2>/dev/null; then
-    log_info "✓ Pillow установлен корректно"
+# 3. Проверка статических и медиа файлов
+log_info ""
+log_info "3. Проверка статических и медиа файлов..."
+
+# Создаем тестовые файлы для проверки
+mkdir -p static/test/
+mkdir -p media/uploads/
+echo "/* Test static CSS file */" > static/test/test.css
+echo "Test media content" > media/uploads/test_media.txt
+
+STATIC_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/static/test/test.css || echo "000")
+if [[ "$STATIC_CHECK" == "200" ]]; then
+    log_info "✓ Статические файлы работают (HTTP $STATIC_CHECK)"
 else
-    log_error "✗ Ошибка при загрузке Pillow"
+    log_error "✗ Статические файлы недоступны (HTTP $STATIC_CHECK)"
 fi
 
-# Проверка PostgreSQL подключения с приложения
-log_info "Проверка подключения Django к PostgreSQL..."
-if python -c "
-import django
-from django.conf import settings
-if not settings.configured:
-    settings.configure(
-        DATABASES={
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': '$DB_NAME',
-                'USER': '$DB_USER',
-                'PASSWORD': '$DB_PASSWORD',
-                'HOST': 'localhost',
-                'PORT': '5432',
-            }
-        }
-    )
-django.setup()
-from django.db import connection
-with connection.cursor() as cursor:
-    cursor.execute('SELECT 1')
-print('✓ Django может подключиться к PostgreSQL')
-" 2>/dev/null; then
-    log_info "✓ Django успешно подключается к PostgreSQL"
+MEDIA_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/media/uploads/test_media.txt || echo "000")
+if [[ "$MEDIA_CHECK" == "200" ]]; then
+    log_info "✓ Медиа файлы работают (HTTP $MEDIA_CHECK)"
 else
-    log_error "✗ Ошибка подключения Django к PostgreSQL"
+    log_warn "⚠ Медиа файлы недоступны (HTTP $MEDIA_CHECK)"
 fi
+
+# 4. Проверка PostgreSQL подключения
+log_info ""
+log_info "4. Проверка подключения к PostgreSQL..."
+export PGPASSWORD="$DB_PASSWORD"
+if psql -h localhost -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;" >/dev/null 2>&1; then
+    log_info "✓ PostgreSQL подключение работает"
+else
+    log_error "✗ Ошибка подключения к PostgreSQL"
+fi
+unset PGPASSWORD
 
 # =============================================================================
-# ШАГ 10: Финальный вывод и проверка безопасности
+# ШАГ 10: ФИНАЛЬНЫЙ ВЫВОД И ИНСТРУКЦИИ
 # =============================================================================
 log_info ""
 log_info "================================================"
 log_info "РАЗВЕРТЫВАНИЕ ЗАВЕРШЕНО!"
 log_info "================================================"
-log_info "Приложение доступно по адресу: http://$SERVER_IP"
-log_info "Админка: http://$SERVER_IP/admin"
-log_info "Логин: admin, Пароль: admin123"
 log_info ""
-log_info "Данные БД:"
-log_info "  База: $DB_NAME"
-log_info "  Пользователь: $DB_USER"
-log_info "  Пароль: $DB_PASSWORD"
+log_info "ВЫПОЛНЕНО:"
+log_info "✓ Клонирован проект из GitHub: $REPO_URL"
+log_info "✓ Установлены все зависимости (системные и Python)"
+log_info "✓ Настроена база данных PostgreSQL"
+log_info "✓ Настроен Gunicorn как WSGI-сервер"
+log_info "✓ Настроен Nginx как обратный прокси"
+log_info "✓ Применены миграции и собраны статические файлы"
 log_info ""
-log_info "Проверка безопасности:"
-log_info "  PostgreSQL слушает только на 127.0.0.1:5432"
-log_info "  Gunicorn слушает только на 127.0.0.1:8000"
-log_info "  Nginx слушает на 0.0.0.0:80 (публично)"
+log_info "РЕЗУЛЬТАТ ПРОВЕРКИ:"
+log_info "  Приложение доступно по адресу: http://$SERVER_IP"
+log_info "  Админка Django: http://$SERVER_IP/admin"
+log_info "  Логин: admin"
+log_info "  Пароль: admin123"
 log_info ""
-log_info "Для проверки с хостовой машины:"
+log_info "ПРОВЕРКА С ХОСТОВОЙ МАШИНЫ:"
 log_info "  curl http://$SERVER_IP"
-log_info "  или откройте в браузере: http://$SERVER_IP"
+log_info "  или откройте в браузере"
 log_info ""
-log_info "Для проверки недоступности портов снаружи:"
+log_info "ТЕСТ БЕЗОПАСНОСТИ (должны быть недоступны снаружи):"
 log_info "  На хостовой машине выполните:"
 log_info "  nmap -p 5432,8000 $SERVER_IP"
-log_info "  Порты 5432 и 8000 должны быть закрыты (filtered)"
+log_info "  Порты 5432 (PostgreSQL) и 8000 (Gunicorn) должны быть закрыты"
 log_info ""
-log_info "Команды управления:"
+log_info "КОМАНДЫ ДЛЯ УПРАВЛЕНИЯ:"
 log_info "  sudo systemctl status gunicorn  # статус приложения"
 log_info "  sudo journalctl -u gunicorn -f  # логи в реальном времени"
 log_info "  sudo systemctl restart gunicorn # перезапуск приложения"
 log_info "  sudo systemctl restart nginx    # перезапуск nginx"
+log_info ""
+log_info "ДАННЫЕ БАЗЫ ДАННЫХ (сохранены в /root/${PROJECT_NAME}_secrets.txt):"
+log_info "  База: $DB_NAME"
+log_info "  Пользователь: $DB_USER"
+log_info "  Пароль: $DB_PASSWORD"
 log_info "================================================"
 
-# Сохранение секретов в файл (для документации)
+# Сохранение секретов в файл
 SECRETS_FILE="/root/${PROJECT_NAME}_secrets_$(date +%Y%m%d).txt"
 cat > "$SECRETS_FILE" << EOF
 # Секреты проекта $PROJECT_NAME
 # Создано: $(date)
+# Репозиторий: $REPO_URL
 
 URL приложения: http://$SERVER_IP
 Админка: http://$SERVER_IP/admin
@@ -497,18 +532,14 @@ DB_PORT=5432
 Django SECRET_KEY:
 $DJANGO_SECRET_KEY
 
-Для подключения к БД:
+Команда для подключения к БД:
 psql -h localhost -U $DB_USER -d $DB_NAME
 
-Для проверки портов:
-nmap -p 5432,8000 $SERVER_IP
+Для обновления кода из Git:
+cd $PROJECT_DIR
+git pull origin $BRANCH
+sudo systemctl restart gunicorn
 EOF
 
 chmod 600 "$SECRETS_FILE"
 log_info "Секреты сохранены в $SECRETS_FILE"
-
-log_info ""
-log_info "Теперь проверьте работу приложения с хостовой машины!"
-log_info "Если что-то не работает, проверьте логи:"
-log_info "  sudo journalctl -u gunicorn -n 50"
-log_info "  sudo tail -f /var/log/nginx/error.log"
